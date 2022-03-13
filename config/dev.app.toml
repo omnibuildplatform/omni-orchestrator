@@ -1,10 +1,13 @@
 name = "omni-orchestrator"
+[server]
 httpPort = 8080
-serverName = "localhost:8080"
 [log]
 logFile = "./logs/info-{date}.log"
 errFile = "./logs/error-{date}.log"
+[jobManager]
+[jobManager.engine]
+[jobManager.persistentStore]
 
-[manager]
-dataFolder = "./data"
-uploadToken = "316462d0c029ba707ad1"
+[logManager]
+[logManager.engine]
+[logManager.persistentStore]

@@ -1,0 +1,103 @@
+package application
+
+import (
+	"errors"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/omnibuildplatform/omni-orchestrator/app"
+	"github.com/omnibuildplatform/omni-orchestrator/common"
+	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
+	"go.uber.org/zap"
+	"net/http"
+)
+
+type Orchestrator struct {
+	jobManager  common.JobManager
+	logManager  common.LogManager
+	appConfig   appconfig.Config
+	routerGroup *gin.RouterGroup
+	logger      *zap.Logger
+}
+
+func NewOrchestrator(config appconfig.Config, group *gin.RouterGroup, logger *zap.Logger) (*Orchestrator, error) {
+	factory, err := common.NewFactory()
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to initialize manager factory %v\n", err))
+	}
+
+	jobManager, err := factory.NewJobManager(*app.AppConfig.JoManager, app.Logger)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to initialize job manager %v\n", err))
+	}
+
+	logManager, err := factory.NewLogManager(*app.AppConfig.LogManager, app.Logger)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to initialize log manager %v\n", err))
+	}
+	return &Orchestrator{
+		jobManager:  jobManager,
+		logManager:  logManager,
+		appConfig:   config,
+		routerGroup: group,
+		logger:      logger,
+	}, nil
+
+}
+
+func (r *Orchestrator) Initialize() error {
+	r.routerGroup.POST("/", r.createJob)
+	r.routerGroup.GET("/", r.queryJob)
+	r.routerGroup.GET("/:jobID", r.getJob)
+	r.routerGroup.DELETE("/:jobID", r.deleteJob)
+	r.routerGroup.POST("/:jobID/logs", r.logs)
+	return nil
+
+}
+
+func (r *Orchestrator) createJob(c *gin.Context) {
+	//parameter validation
+	var job common.Job
+	var err error
+	if err = c.ShouldBindJSON(&job); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// valid job type
+	jobKind := r.jobManager.AcceptableJob(job)
+	if jobKind == common.JobUnrecognized {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unrecognized job kind"})
+		return
+	}
+	err = r.jobManager.CreateJob(job, jobKind)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+}
+
+func (r *Orchestrator) queryJob(c *gin.Context) {
+
+}
+
+func (r *Orchestrator) getJob(c *gin.Context) {
+	jobID := c.Param("jobID")
+	_ = jobID
+}
+
+func (r *Orchestrator) deleteJob(c *gin.Context) {
+	jobID := c.Param("jobID")
+	_ = jobID
+}
+
+func (r *Orchestrator) logs(c *gin.Context) {
+	jobID := c.Param("jobID")
+	_ = jobID
+}
+
+func (r *Orchestrator) StartLoop() {
+}
+
+func (r *Orchestrator) Close() {
+
+}

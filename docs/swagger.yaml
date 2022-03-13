@@ -1,0 +1,36 @@
+definitions:
+  app.ApplicationInfo:
+    properties:
+      commitID:
+        type: string
+      releaseAt:
+        type: string
+      tag:
+        type: string
+    type: object
+  controller.ApplicationStatus:
+    properties:
+      info:
+        $ref: '#/definitions/app.ApplicationInfo'
+      status:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: get application health status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.ApplicationStatus'
+      summary: Application health
+      tags:
+      - Status
+swagger: "2.0"

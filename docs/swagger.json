@@ -1,0 +1,58 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "get application health status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Status"
+                ],
+                "summary": "Application health",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ApplicationStatus"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "app.ApplicationInfo": {
+            "type": "object",
+            "properties": {
+                "commitID": {
+                    "type": "string"
+                },
+                "releaseAt": {
+                    "type": "string"
+                },
+                "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "controller.ApplicationStatus": {
+            "type": "object",
+            "properties": {
+                "info": {
+                    "$ref": "#/definitions/app.ApplicationInfo"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gin-gonic/gin"
 	"github.com/gookit/color"
 	"github.com/omnibuildplatform/omni-orchestrator/app"
 	"github.com/omnibuildplatform/omni-orchestrator/application"
@@ -11,29 +12,44 @@ import (
 )
 
 var (
-	manager *application.OrchestratorManager
+	Tag       string //Git tag name, filled when generating binary
+	CommitID  string //Git commit ID, filled when generating binary
+	ReleaseAt string //Publish date, filled when generating binary
+	scheduler *application.Orchestrator
 )
 
 func init() {
-	app.Bootstrap("./config")
+	app.Bootstrap("./config", &app.ApplicationInfo{
+		Tag:       Tag,
+		CommitID:  CommitID,
+		ReleaseAt: ReleaseAt,
+	})
 	application.InitServer()
 }
 func main() {
 	listenSignals()
 	var err error
-	manager, err = application.NewOrchestratorManager(application.Server().Group("/"))
+	scheduler, err = application.NewOrchestrator(app.AppConfig, application.RouterGroup().Group("/jobs"),
+		app.Logger)
 	if err != nil {
-		color.Error.Printf("failed to initialize repository manager %v\n", err)
+		color.Error.Printf("failed to initialize job manager %v\n", err)
 		os.Exit(1)
 	}
-	err = manager.Initialize()
-	if err != nil {
-		color.Error.Printf("failed to start repository manager %v\n ", err)
-		os.Exit(1)
-	}
-	manager.StartLoop()
+	scheduler.StartLoop()
 	color.Info.Printf("============  Begin Running(PID: %d) ============\n", os.Getpid())
 	application.Run()
+}
+
+func QueryJob(c *gin.Context) {
+	c.JSON(200, "")
+}
+
+func GetJob(c *gin.Context) {
+	c.JSON(200, "")
+}
+
+func CreateJob(c *gin.Context) {
+	c.JSON(200, "")
 }
 
 // listenSignals Graceful start/stop server
@@ -61,11 +77,11 @@ func handleSignals(c chan os.Signal) {
 	// sync logs
 	_ = app.Logger.Sync()
 
-	if manager != nil {
-		manager.Close()
+	if scheduler != nil {
+		scheduler.Close()
 	}
 	//sleep and exit
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 	color.Info.Println("\nGoodBye...")
 	os.Exit(0)
 }

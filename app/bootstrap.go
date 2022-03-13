@@ -7,24 +7,24 @@ import (
 	"github.com/gookit/config/v2"
 	"github.com/gookit/config/v2/dotnev"
 	"github.com/gookit/config/v2/toml"
-	"github.com/gookit/goutil/fsutil"
-	"github.com/gookit/goutil/jsonutil"
+	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 var (
-	Config *config.Config
+	Config    *config.Config
+	AppConfig appconfig.Config
 )
 
-func Bootstrap(configDir string) {
-	//Load config
-	loadConfig(configDir)
+func Bootstrap(configDir string, appInfo *ApplicationInfo) {
 	//Initialize environment
 	initAppEnv()
+	//Load config
+	loadConfig(configDir)
 	//init app
-	initAppInfo()
+	Info = appInfo
+	initApp()
 	//init logger
 	initLogger()
 	color.Info.Printf(
@@ -33,23 +33,10 @@ func Bootstrap(configDir string) {
 	)
 }
 
-func initAppInfo() {
-	//update App info
+func initApp() {
 	Name = config.String("name", DefaultAppName)
 	if httpPort := config.Int("httpPort", 0); httpPort != 0 {
 		HttpPort = httpPort
-	}
-
-	// git repo info
-	//TODO: update dockerfile to publish git information to app.json
-	GitInfo = AppInfo{}
-	infoFile := "app.json"
-
-	if fsutil.IsFile(infoFile) {
-		err := jsonutil.ReadFile(infoFile, &GitInfo)
-		if err != nil {
-			color.Error.Println(err.Error())
-		}
 	}
 
 }
@@ -60,6 +47,7 @@ func loadConfig(configDir string) {
 		color.Error.Printf("failed to load config files in folder %s %v\n", configDir, err)
 		os.Exit(1)
 	}
+	config.WithOptions(config.ParseEnv)
 	Config = config.Default()
 	config.AddDriver(toml.Driver)
 	err = Config.LoadFiles(files...)
@@ -67,6 +55,12 @@ func loadConfig(configDir string) {
 		color.Error.Println("failed to load config files %v", err)
 		os.Exit(1)
 	}
+	err = config.BindStruct("", &AppConfig)
+	if err != nil {
+		color.Error.Println("config file mismatched with current config object %v", err)
+		os.Exit(1)
+	}
+	HttpPort = AppConfig.ServerConfig.HttpPort
 }
 
 func getConfigFiles(configDir string) ([]string, error) {
@@ -99,9 +93,6 @@ func initAppEnv() {
 	Hostname, _ = os.Hostname()
 	if env := os.Getenv("APP_ENV"); env != "" {
 		EnvName = env
-	}
-	if port := os.Getenv("APP_PORT"); port != "" {
-		HttpPort, _ = strconv.Atoi(port)
 	}
 
 	if EnvName == EnvDev || EnvName == EnvTest {
