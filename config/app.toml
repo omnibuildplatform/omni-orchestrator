@@ -1,0 +1,11 @@
+name = "omni-orchestrator"
+timezone = "PRC"
+httpPort = 8080
+serverName = "localhost:8080"
+[log]
+logFile = "/app/logs/run-application-{date}.log"
+errFile = "/app/logs/run-error-{date}.log"
+
+[manager]
+dataFolder = "/app/data/"
+uploadToken = "316462d0c029ba707ad1"

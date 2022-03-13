@@ -1,0 +1,15 @@
+resources:
+- namespace.yaml
+- deployment.yaml
+- service.yaml
+- pvc.yaml
+- config.yaml
+- rbac.yaml
+- ingress.yaml
+commonLabels:
+  owner: tommylike
+  app: omni-repository-server
+commonAnnotations:
+  email: tommylikehu@gmail.com
+namespace: omni-repository
+
