@@ -1,6 +1,7 @@
 package cadence
 
 import (
+	"context"
 	"github.com/omnibuildplatform/omni-orchestrator/common"
 )
 
@@ -17,6 +18,10 @@ func (e *Engine) GetName() string {
 func (e *Engine) GetSupportedJobs() []common.JobKind {
 	return []common.JobKind{}
 }
-func (e *Engine) BuildImage(job common.Job, spec common.JobImageBuildPara) error {
+func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.JobImageBuildPara) error {
 	return nil
+}
+
+func (e *Engine) GetJob(ctx context.Context, domain, jobID string) (*common.Job, error) {
+	return nil, nil
 }

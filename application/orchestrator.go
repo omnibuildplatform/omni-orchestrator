@@ -1,12 +1,15 @@
 package application
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/omnibuildplatform/omni-orchestrator/app"
 	"github.com/omnibuildplatform/omni-orchestrator/common"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
+	"github.com/omnibuildplatform/omni-orchestrator/common/engine"
+	"github.com/omnibuildplatform/omni-orchestrator/common/store"
 	"go.uber.org/zap"
 	"net/http"
 )
@@ -25,7 +28,19 @@ func NewOrchestrator(config appconfig.Config, group *gin.RouterGroup, logger *za
 		return nil, errors.New(fmt.Sprintf("failed to initialize manager factory %v\n", err))
 	}
 
-	jobManager, err := factory.NewJobManager(*app.AppConfig.JoManager, app.Logger)
+	engineFactory := engine.NewEngineFactory(logger)
+	jobEngine, err := engineFactory.CreateJobEngine(config.Engine, logger)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to initialize job engine %v\n", err))
+	}
+
+	storeFactory := store.NewStoreFactory(logger)
+	jobStore, err := storeFactory.CreateJobStore(config.PersistentStore, logger)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to initialize job store %v\n", err))
+	}
+
+	jobManager, err := factory.NewJobManager(jobEngine, jobStore, *app.AppConfig.JobManager, app.Logger)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("failed to initialize job manager %v\n", err))
 	}
@@ -63,12 +78,12 @@ func (r *Orchestrator) createJob(c *gin.Context) {
 		return
 	}
 	// valid job type
-	jobKind := r.jobManager.AcceptableJob(job)
+	jobKind := r.jobManager.AcceptableJob(context.TODO(), job)
 	if jobKind == common.JobUnrecognized {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unrecognized job kind"})
 		return
 	}
-	err = r.jobManager.CreateJob(job, jobKind)
+	err = r.jobManager.CreateJob(context.TODO(), job, jobKind)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

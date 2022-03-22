@@ -16,11 +16,11 @@ import (
 )
 
 const (
-	DefaultJobTTL = 1800
-	DefaultJobRetry = 2
+	DefaultJobTTL             = 1800
+	DefaultJobRetry           = 2
 	DefaultPackagesConfigFile = "openEuler-customized.json"
-	DefaultImageConfigFile = "conf.yaml"
-	DefaultImageConfig = `
+	DefaultImageConfigFile    = "conf.yaml"
+	DefaultImageConfig        = `
 working_dir: /opt/omni-workspace
 debug: True
 user_name: root
@@ -33,14 +33,13 @@ repo_file: /etc/omni-imager/repos/%s.repo`
 )
 
 type BuildImagePackages struct {
-	Packages []string    `json:"packages"`
+	Packages []string `json:"packages"`
 }
 
 type Engine struct {
-	logger *zap.Logger
+	logger    *zap.Logger
 	clientSet *kubernetes.Clientset
-	config appconfig.Engine
-
+	config    appconfig.Engine
 }
 
 func NewEngine(config appconfig.Engine, logger *zap.Logger) (common.JobEngine, error) {
@@ -53,8 +52,8 @@ func NewEngine(config appconfig.Engine, logger *zap.Logger) (common.JobEngine, e
 		return nil, err
 	}
 	return &Engine{
-		logger: logger,
-		config: config,
+		logger:    logger,
+		config:    config,
 		clientSet: clientSet,
 	}, nil
 }
@@ -69,7 +68,7 @@ func (e *Engine) Initialize() error {
 }
 
 func (e *Engine) CreateNamespaceIfNeeded(domain string) error {
-	_, err := e.clientSet.CoreV1().Namespaces().Get(context.TODO(), domain, metav1.GetOptions{})
+	_, err := e.clientSet.CoreV1().Namespaces().Get(domain, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			namespace := v1.Namespace{
@@ -80,7 +79,7 @@ func (e *Engine) CreateNamespaceIfNeeded(domain string) error {
 					},
 				},
 			}
-			_, err := e.clientSet.CoreV1().Namespaces().Create(context.TODO(), &namespace, metav1.CreateOptions{})
+			_, err := e.clientSet.CoreV1().Namespaces().Create(&namespace)
 			if err != nil {
 				return err
 			}
@@ -114,31 +113,31 @@ func (e *Engine) prepareJobConfigmap(job common.Job, spec common.JobImageBuildPa
 	//prepare configmap
 	configMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: job.ID,
+			Name:      job.ID,
 			Namespace: job.Domain,
 			Annotations: map[string]string{
-				"controlled-by": "omni-orchestrator",
+				"controlled-by":    "omni-orchestrator",
 				"omni-tag/service": job.Service,
-				"omni-tag/user": job.UserID,
+				"omni-tag/user":    job.UserID,
 			},
-			OwnerReferences:[]metav1.OwnerReference{
+			OwnerReferences: []metav1.OwnerReference{
 				//TODO: Add job reference
 			},
 		},
 		Data: map[string]string{
 			DefaultPackagesConfigFile: string(packages),
-			DefaultImageConfigFile: fmt.Sprintf(DefaultImageConfig, spec.Version),
+			DefaultImageConfigFile:    fmt.Sprintf(DefaultImageConfig, spec.Version),
 		},
 	}
-	_, err = e.clientSet.CoreV1().ConfigMaps(job.Domain).Get(context.TODO(), job.ID, metav1.GetOptions{})
+	_, err = e.clientSet.CoreV1().ConfigMaps(job.Domain).Get(job.ID, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(job.Domain).Create(context.TODO(), &configMap, metav1.CreateOptions{})
+		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(job.Domain).Create(&configMap)
 		if err != nil {
 			return "", nil
 		}
 		return newConfigmap.Name, nil
 	} else if err == nil {
-		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(job.Domain).Update(context.TODO(), &configMap, metav1.UpdateOptions{})
+		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(job.Domain).Update(&configMap)
 		if err != nil {
 			return "", nil
 		}
@@ -153,20 +152,20 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 	privileged := true
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-		Name: job.ID,
-		Namespace: job.Domain,
-		Annotations: map[string]string{
-		"controlled-by": "omni-orchestrator",
-		"omni-tag/service": job.Service,
-		"omni-tag/user": job.UserID,
+			Name:      job.ID,
+			Namespace: job.Domain,
+			Annotations: map[string]string{
+				"controlled-by":    "omni-orchestrator",
+				"omni-tag/service": job.Service,
+				"omni-tag/user":    job.UserID,
 			},
 		},
 		Spec: batchv1.JobSpec{
 			TTLSecondsAfterFinished: &jobTTLSecondsAfterFinished,
-			BackoffLimit: &jobRetry,
+			BackoffLimit:            &jobRetry,
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
-					RestartPolicy:v1.RestartPolicyNever,
+					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
 							Name:  "job-finished",
@@ -188,7 +187,6 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 									Name:      fmt.Sprintf("%s-config", job.ID),
 									MountPath: fmt.Sprintf("/etc/omni-imager/%s", DefaultPackagesConfigFile),
 									SubPath:   DefaultPackagesConfigFile,
-
 								},
 								{
 									Name:      fmt.Sprintf("%s-config", job.ID),
@@ -249,7 +247,7 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 
 }
 
-func (e *Engine) BuildOSImage(job common.Job, spec common.JobImageBuildPara) error {
+func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.JobImageBuildPara) error {
 	//prepare configmap
 	configMapName, err := e.prepareJobConfigmap(job, spec)
 	if err != nil {
@@ -257,15 +255,15 @@ func (e *Engine) BuildOSImage(job common.Job, spec common.JobImageBuildPara) err
 	}
 	//prepare job resource
 	jobResource := e.generateBuildOSImageJob(job, spec, configMapName)
-	_, err = e.clientSet.BatchV1().Jobs(job.Domain).Get(context.TODO(), job.ID, metav1.GetOptions{})
+	_, err = e.clientSet.BatchV1().Jobs(job.Domain).Get(job.ID, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		_, err := e.clientSet.BatchV1().Jobs(job.Domain).Create(context.TODO(), jobResource, metav1.CreateOptions{})
+		_, err := e.clientSet.BatchV1().Jobs(job.Domain).Create(jobResource)
 		if err != nil {
 			return err
 		}
 		return nil
 	} else if err == nil {
-		_, err = e.clientSet.BatchV1().Jobs(job.Domain).Update(context.TODO(), jobResource, metav1.UpdateOptions{})
+		_, err = e.clientSet.BatchV1().Jobs(job.Domain).Update(jobResource)
 		if err != nil {
 			return err
 		}
@@ -274,12 +272,12 @@ func (e *Engine) BuildOSImage(job common.Job, spec common.JobImageBuildPara) err
 	return err
 }
 
-func (e *Engine) QueryJobStatus(domain, jobID string) (*common.Job, error) {
+func (e *Engine) GetJob(ctx context.Context, domain, jobID string) (*common.Job, error) {
 	jobResource := common.Job{
-		ID: jobID,
+		ID:     jobID,
 		Domain: domain,
 	}
-	existing, err := e.clientSet.BatchV1().Jobs(domain).Get(context.TODO(), jobID, metav1.GetOptions{})
+	existing, err := e.clientSet.BatchV1().Jobs(domain).Get(jobID, metav1.GetOptions{})
 	if err == nil {
 		completionRequired := existing.Spec.Completions
 		backoffLimitRequired := existing.Spec.BackoffLimit

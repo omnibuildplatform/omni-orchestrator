@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"github.com/omnibuildplatform/omni-orchestrator/common/config"
 	"go.uber.org/zap"
 	"time"
@@ -59,17 +60,17 @@ type (
 
 	Factory interface {
 		Closeable
-		NewJobManager(config config.JobManager, logger *zap.Logger) (JobManager, error)
+		NewJobManager(engine JobEngine, store JobStore, config config.JobManager, logger *zap.Logger) (JobManager, error)
 		NewLogManager(config config.LobManager, logger *zap.Logger) (LogManager, error)
 	}
 
 	JobManager interface {
 		Closeable
 		GetName() string
-		CreateJob(j Job, kind JobKind) error
-		AcceptableJob(j Job) JobKind
-		DeleteJob(jobID string) error
-		GetJob(jobID string) Job
+		CreateJob(ctx context.Context, j Job, kind JobKind) error
+		AcceptableJob(ctx context.Context, j Job) JobKind
+		DeleteJob(ctx context.Context, jobID string) error
+		GetJob(ctx context.Context, jobID string) Job
 	}
 
 	LogManager interface {
@@ -78,12 +79,26 @@ type (
 		StartLoop() error
 	}
 
+	EngineFactory interface {
+		CreateJobEngine(config config.Engine, logger *zap.Logger) (JobEngine, error)
+	}
+	StoreFactory interface {
+		CreateJobStore(config config.PersistentStore, logger *zap.Logger) (JobStore, error)
+	}
+
 	JobEngine interface {
 		Closeable
 		Initialize() error
 		GetName() string
 		GetSupportedJobs() []JobKind
-		BuildOSImage(job Job, spec JobImageBuildPara) error
-		QueryJobStatus(domain, jobID string) (*Job, error)
+		BuildOSImage(ctx context.Context, job Job, spec JobImageBuildPara) error
+		GetJob(ctx context.Context, domain, jobID string) (*Job, error)
+	}
+
+	JobStore interface {
+		Closeable
+		Initialize() error
+		GetName() string
+		CreateJob(ctx context.Context, job *Job) (string, error)
 	}
 )
