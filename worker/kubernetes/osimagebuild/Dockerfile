@@ -1,6 +1,6 @@
 FROM openeuler/openeuler:21.09
 LABEL maintainer="TommyLike<tommylikehu@gmail.com>"
-ARG ImageVersion="0.1.3"
+ARG ImageVersion="0.1.4"
 
 # Update repo
 COPY openEuler.repo /etc/yum.repos.d/openEuler.repo
