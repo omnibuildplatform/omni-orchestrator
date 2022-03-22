@@ -8,7 +8,7 @@ import (
 type factoryImpl struct {
 }
 
-func NewFactory() (Factory, error) {
+func NewFactory() (ManagerFactory, error) {
 	return nil, nil
 }
 

@@ -58,8 +58,14 @@ type (
 		Close()
 	}
 
-	Factory interface {
-		Closeable
+	EngineFactory interface {
+		CreateJobEngine(config config.Engine, logger *zap.Logger) (JobEngine, error)
+	}
+	StoreFactory interface {
+		CreateJobStore(config config.PersistentStore, logger *zap.Logger) (JobStore, error)
+	}
+
+	ManagerFactory interface {
 		NewJobManager(engine JobEngine, store JobStore, config config.JobManager, logger *zap.Logger) (JobManager, error)
 		NewLogManager(config config.LobManager, logger *zap.Logger) (LogManager, error)
 	}
@@ -77,13 +83,6 @@ type (
 		Closeable
 		GetName() string
 		StartLoop() error
-	}
-
-	EngineFactory interface {
-		CreateJobEngine(config config.Engine, logger *zap.Logger) (JobEngine, error)
-	}
-	StoreFactory interface {
-		CreateJobStore(config config.PersistentStore, logger *zap.Logger) (JobStore, error)
 	}
 
 	JobEngine interface {
