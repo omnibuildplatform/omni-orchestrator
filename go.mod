@@ -9,6 +9,7 @@ require (
 	github.com/gocql/gocql v1.0.0
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/uuid v1.3.0
 	github.com/gookit/color v1.3.8
 	github.com/gookit/config/v2 v2.0.23
 	github.com/gookit/goutil v0.3.12

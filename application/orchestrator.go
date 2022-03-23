@@ -25,33 +25,33 @@ type Orchestrator struct {
 func NewOrchestrator(config appconfig.Config, group *gin.RouterGroup, logger *zap.Logger) (*Orchestrator, error) {
 	factory, err := common.NewFactory()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to initialize manager factory %v\n", err))
+		return nil, errors.New(fmt.Sprintf("failed to initialize manager factory: %v\n", err))
 	}
 
 	engineFactory := engine.NewEngineFactory(logger)
 	jobEngine, err := engineFactory.CreateJobEngine(config.Engine, logger)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to initialize job engine %v\n", err))
+		return nil, errors.New(fmt.Sprintf("failed to initialize job engine: %v\n", err))
 	}
 
 	storeFactory := store.NewStoreFactory(logger)
 	jobStore, err := storeFactory.CreateJobStore(config.PersistentStore, logger)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to initialize job store %v\n", err))
+		return nil, errors.New(fmt.Sprintf("failed to initialize job store: %v\n", err))
 	}
 
 	jobManager, err := factory.NewJobManager(jobEngine, jobStore, *app.AppConfig.JobManager, app.Logger)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to initialize job manager %v\n", err))
+		return nil, errors.New(fmt.Sprintf("failed to initialize job manager: %v\n", err))
 	}
 
-	logManager, err := factory.NewLogManager(*app.AppConfig.LogManager, app.Logger)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to initialize log manager %v\n", err))
-	}
+	//logManager, err := factory.NewLogManager(*app.AppConfig.LogManager, app.Logger)
+	//if err != nil {
+	//	return nil, errors.New(fmt.Sprintf("failed to initialize log manager: %v\n", err))
+	//}
 	return &Orchestrator{
 		jobManager:  jobManager,
-		logManager:  logManager,
+		logManager:  nil,
 		appConfig:   config,
 		routerGroup: group,
 		logger:      logger,
@@ -83,12 +83,16 @@ func (r *Orchestrator) createJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unrecognized job kind"})
 		return
 	}
+	if len(job.Spec) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "job spec empty"})
+		return
+	}
 	err = r.jobManager.CreateJob(context.TODO(), job, jobKind)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	c.JSON(http.StatusCreated, job)
 }
 
 func (r *Orchestrator) queryJob(c *gin.Context) {

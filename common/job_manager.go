@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
 	"go.uber.org/zap"
@@ -29,16 +31,25 @@ func (m *jobManagerImpl) GetName() string {
 }
 
 func (m *jobManagerImpl) CreateJob(ctx context.Context, job Job, kind JobKind) error {
-	var err error
 	switch kind {
 	case JobImageBuild:
-		var para JobImageBuildPara
-		err = mapstructure.Decode(job.Spec, para)
-		if err != nil {
-			return err
-		}
+		return m.createBuildISOJob(ctx, job)
 	}
 	return nil
+}
+
+func (m jobManagerImpl) createBuildISOJob(ctx context.Context, job Job) error {
+	var err error
+	var para = JobImageBuildPara{}
+	err = mapstructure.Decode(job.Spec, &para)
+	if err != nil {
+		return errors.New(fmt.Sprintf("unable to decode job specification %s", err))
+	}
+	//create record
+	job.ID = uuid.New().String()
+	//start up job
+	//update job information
+	return m.engine.BuildOSImage(ctx, job, para)
 }
 
 func (m *jobManagerImpl) jobSupported(kind JobKind) bool {
@@ -51,7 +62,7 @@ func (m *jobManagerImpl) jobSupported(kind JobKind) bool {
 }
 func (m *jobManagerImpl) AcceptableJob(ctx context.Context, job Job) JobKind {
 	if job.Engine != m.engine.GetName() {
-		m.logger.Info(fmt.Sprintf("configured engine %s while job asked %s", job.Engine, m.engine.GetName()))
+		m.logger.Info(fmt.Sprintf("configured engine %s while job asked for engine %s", m.engine.GetName(), job.Engine))
 		return JobUnrecognized
 	}
 	for _, j := range AvailableJobs {

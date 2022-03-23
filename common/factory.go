@@ -9,14 +9,10 @@ type factoryImpl struct {
 }
 
 func NewFactory() (ManagerFactory, error) {
-	return nil, nil
+	return &factoryImpl{}, nil
 }
 
-func (f *factoryImpl) Close() {
-
-}
-
-func (f *factoryImpl) NewJobManager(config config.JobManager, logger *zap.Logger, engine JobEngine, store JobStore) (JobManager, error) {
+func (f *factoryImpl) NewJobManager(engine JobEngine, store JobStore, config config.JobManager, logger *zap.Logger) (JobManager, error) {
 	return NewJobManagerImpl(engine, store, config, logger)
 }
 func (f *factoryImpl) NewLogManager(config config.LobManager, logger *zap.Logger) (LogManager, error) {

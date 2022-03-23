@@ -5,9 +5,6 @@ httpPort = 8080
 logFile = "./logs/run-application-{date}.log"
 errFile = "./logs/run-error-{date}.log"
 [jobManager]
-[jobManager.engine]
-[jobManager.persistentStore]
-
 [logManager]
-[logManager.engine]
-[logManager.persistentStore]
+[engine]
+[persistentStore]

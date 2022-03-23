@@ -5,9 +5,12 @@ httpPort = 8080
 logFile = "./logs/info-{date}.log"
 errFile = "./logs/error-{date}.log"
 [jobManager]
-[jobManager.engine]
-[jobManager.persistentStore]
-
 [logManager]
-[logManager.engine]
-[logManager.persistentStore]
+[engine]
+pluginName = "kubernetes"
+configFile = "/Users/tommylike/.kube/infra-test.yaml"
+imageTagForOSImageBuild = "tommylike/omni-worker:0.1.4"
+OmniRepoAddress = "http://omni-repository.omni-repository.svc.cluster.local/data/upload"
+OmniRepoToken = "316462d0c029ba707ad2"
+[persistentStore]
+pluginName = "cassandra"

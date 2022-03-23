@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"strings"
 )
 
 const (
@@ -20,8 +21,7 @@ const (
 	DefaultJobRetry           = 2
 	DefaultPackagesConfigFile = "openEuler-customized.json"
 	DefaultImageConfigFile    = "conf.yaml"
-	DefaultImageConfig        = `
-working_dir: /opt/omni-workspace
+	DefaultImageConfig        = `working_dir: /data/omni-workspace
 debug: True
 user_name: root
 user_passwd: openEuler
@@ -67,13 +67,13 @@ func (e *Engine) Initialize() error {
 	return nil
 }
 
-func (e *Engine) CreateNamespaceIfNeeded(domain string) error {
-	_, err := e.clientSet.CoreV1().Namespaces().Get(domain, metav1.GetOptions{})
+func (e *Engine) CreateNamespaceIfNeeded(ns string) error {
+	_, err := e.clientSet.CoreV1().Namespaces().Get(ns, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			namespace := v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: domain,
+					Name: ns,
 					Annotations: map[string]string{
 						"controlledBy": "omni-orchestrator",
 					},
@@ -87,7 +87,7 @@ func (e *Engine) CreateNamespaceIfNeeded(domain string) error {
 			return err
 		}
 	}
-	e.logger.Info(fmt.Sprintf("namespace %s already exists in kubernetes", domain))
+	e.logger.Info(fmt.Sprintf("namespace %s already exists in kubernetes", ns))
 	return nil
 }
 
@@ -99,14 +99,14 @@ func (e *Engine) GetName() string {
 	return "kubernetes"
 }
 func (e *Engine) GetSupportedJobs() []common.JobKind {
-	return []common.JobKind{}
+	return []common.JobKind{common.JobImageBuild}
 }
 
 func (e *Engine) prepareJobConfigmap(job common.Job, spec common.JobImageBuildPara) (string, error) {
 	pkg := BuildImagePackages{
 		Packages: spec.Packages,
 	}
-	packages, err := json.Marshal(pkg)
+	packages, err := json.MarshalIndent(pkg, "", "\t")
 	if err != nil {
 		return "", err
 	}
@@ -114,7 +114,7 @@ func (e *Engine) prepareJobConfigmap(job common.Job, spec common.JobImageBuildPa
 	configMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      job.ID,
-			Namespace: job.Domain,
+			Namespace: e.ConvertToNamespace(job.Domain),
 			Annotations: map[string]string{
 				"controlled-by":    "omni-orchestrator",
 				"omni-tag/service": job.Service,
@@ -129,15 +129,15 @@ func (e *Engine) prepareJobConfigmap(job common.Job, spec common.JobImageBuildPa
 			DefaultImageConfigFile:    fmt.Sprintf(DefaultImageConfig, spec.Version),
 		},
 	}
-	_, err = e.clientSet.CoreV1().ConfigMaps(job.Domain).Get(job.ID, metav1.GetOptions{})
+	_, err = e.clientSet.CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Get(job.ID, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(job.Domain).Create(&configMap)
+		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Create(&configMap)
 		if err != nil {
 			return "", nil
 		}
 		return newConfigmap.Name, nil
 	} else if err == nil {
-		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(job.Domain).Update(&configMap)
+		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Update(&configMap)
 		if err != nil {
 			return "", nil
 		}
@@ -153,7 +153,7 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      job.ID,
-			Namespace: job.Domain,
+			Namespace: e.ConvertToNamespace(job.Domain),
 			Annotations: map[string]string{
 				"controlled-by":    "omni-orchestrator",
 				"omni-tag/service": job.Service,
@@ -168,16 +168,16 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Name:  "job-finished",
+							Name:  "job-completed",
 							Image: "alpine/curl",
 							Command: []string{
-								"echo", "job finished",
+								"echo", "job succeed",
 							},
 						},
 					},
 					InitContainers: []v1.Container{
 						{
-							Name:  "init-01-osimage-build",
+							Name:  "01-osimage-build",
 							Image: e.config.ImageTagForOSImageBuild,
 							SecurityContext: &v1.SecurityContext{
 								Privileged: &privileged,
@@ -195,7 +195,7 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 								},
 								{
 									Name:      fmt.Sprintf("%s-data", job.ID),
-									MountPath: "/opt/omni-workspace",
+									MountPath: "/data/",
 								},
 							},
 							Command: []string{
@@ -207,16 +207,16 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 							},
 						},
 						{
-							Name:  "init-02-image-upload",
+							Name:  "02-image-upload",
 							Image: "alpine/curl",
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      fmt.Sprintf("%s-data", job.ID),
-									MountPath: "/opt/omni-workspace",
+									MountPath: "/data/",
 								},
 							},
 							Command: []string{
-								"curl", "-vvv", fmt.Sprintf("-Ffile=@/opt/omni-workspace/openEuler-%s.iso", job.ID),
+								"curl", "-vvv", fmt.Sprintf("-Ffile=@/data/omni-workspace/openEuler-%s.iso", job.ID),
 								fmt.Sprintf("-Fproject=%s", spec.Version), "-FfileType=image",
 								fmt.Sprintf("%s?token=%s", e.config.OmniRepoAddress, e.config.OmniRepoToken),
 							},
@@ -247,7 +247,17 @@ func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBui
 
 }
 
+func (e *Engine) ConvertToNamespace(domain string) string {
+	return strings.ToLower(domain)
+}
+
 func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.JobImageBuildPara) error {
+	var err error
+	//prepare namespace
+	err = e.CreateNamespaceIfNeeded(e.ConvertToNamespace(job.Domain))
+	if err != nil {
+		return err
+	}
 	//prepare configmap
 	configMapName, err := e.prepareJobConfigmap(job, spec)
 	if err != nil {
@@ -255,15 +265,15 @@ func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.J
 	}
 	//prepare job resource
 	jobResource := e.generateBuildOSImageJob(job, spec, configMapName)
-	_, err = e.clientSet.BatchV1().Jobs(job.Domain).Get(job.ID, metav1.GetOptions{})
+	_, err = e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Get(job.ID, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		_, err := e.clientSet.BatchV1().Jobs(job.Domain).Create(jobResource)
+		_, err := e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Create(jobResource)
 		if err != nil {
 			return err
 		}
 		return nil
 	} else if err == nil {
-		_, err = e.clientSet.BatchV1().Jobs(job.Domain).Update(jobResource)
+		_, err = e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Update(jobResource)
 		if err != nil {
 			return err
 		}

@@ -3,7 +3,7 @@ package cadence
 import (
 	"github.com/omnibuildplatform/omni-orchestrator/common"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
-	"github.com/omnibuildplatform/omni-orchestrator/common/engine"
+	pluginPkg "github.com/omnibuildplatform/omni-orchestrator/common/engine/plugin"
 	"go.uber.org/zap"
 )
 
@@ -13,10 +13,10 @@ const (
 
 type plugin struct{}
 
-var _ engine.Plugin = (*plugin)(nil)
+var _ pluginPkg.Plugin = (*plugin)(nil)
 
 func init() {
-	engine.RegisterPlugin(PluginName, &plugin{})
+	pluginPkg.RegisterPlugin(PluginName, &plugin{})
 }
 
 func (p *plugin) CreateEngine(cfg appconfig.Engine, logger *zap.Logger) (common.JobEngine, error) {

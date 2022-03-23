@@ -32,6 +32,11 @@ func main() {
 	scheduler, err = application.NewOrchestrator(app.AppConfig, application.RouterGroup().Group("/jobs"),
 		app.Logger)
 	if err != nil {
+		color.Error.Printf("failed to create orchestrator: %v\n", err)
+		os.Exit(1)
+	}
+	err = scheduler.Initialize()
+	if err != nil {
 		color.Error.Printf("failed to initialize orchestrator: %v\n", err)
 		os.Exit(1)
 	}

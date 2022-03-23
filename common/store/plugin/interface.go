@@ -1,4 +1,4 @@
-package engine
+package plugin
 
 import (
 	"go.uber.org/zap"
@@ -9,6 +9,6 @@ import (
 
 type (
 	Plugin interface {
-		CreateEngine(cfg appconfig.Engine, logger *zap.Logger) (common.JobEngine, error)
+		CreateJobStore(cfg appconfig.PersistentStore, logger *zap.Logger) (common.JobStore, error)
 	}
 )

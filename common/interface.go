@@ -36,22 +36,22 @@ type (
 	}
 
 	Job struct {
-		Service       string            `json:"service" binding:"required"`
-		Domain        string            `json:"domain" binding:"required"`
-		ID            string            `json:"id"`
-		UserID        string            `json:"userID" binding:"required"`
-		Task          string            `json:"task" binding:"required"`
-		Spec          map[string]string `json:"spec"`
-		Engine        string            `json:"engine"`
-		StartTime     time.Time         `json:"startTime"`
-		EndTime       time.Time         `json:"endTime"`
-		State         JobState          `json:"state"`
-		JobResult     string            `json:"jobResult"`
-		FailureDetail string            `json:"failureDetail"`
-		LogUrl        string            `json:"logUrl"`
-		Duration      int               `json:"duration"`
-		TotalStep     int               `json:"totalStep"`
-		CurrentStep   int               `json:"currentStep"`
+		Service       string                 `json:"service" binding:"required"`
+		Domain        string                 `json:"domain" binding:"required"`
+		ID            string                 `json:"id"`
+		UserID        string                 `json:"userID" binding:"required"`
+		Task          string                 `json:"task" binding:"required"`
+		Spec          map[string]interface{} `json:"spec"`
+		Engine        string                 `json:"engine" binding:"required"`
+		StartTime     time.Time              `json:"startTime"`
+		EndTime       time.Time              `json:"endTime"`
+		State         JobState               `json:"state"`
+		JobResult     string                 `json:"jobResult"`
+		FailureDetail string                 `json:"failureDetail"`
+		LogUrl        string                 `json:"logUrl"`
+		Duration      int                    `json:"duration"`
+		TotalStep     int                    `json:"totalStep"`
+		CurrentStep   int                    `json:"currentStep"`
 	}
 
 	Closeable interface {
