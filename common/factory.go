@@ -15,6 +15,6 @@ func NewFactory() (ManagerFactory, error) {
 func (f *factoryImpl) NewJobManager(engine JobEngine, store JobStore, config config.JobManager, logger *zap.Logger) (JobManager, error) {
 	return NewJobManagerImpl(engine, store, config, logger)
 }
-func (f *factoryImpl) NewLogManager(config config.LobManager, logger *zap.Logger) (LogManager, error) {
-	return nil, nil
+func (f *factoryImpl) NewLogManager(engine JobEngine, store JobStore, config config.LogManager, logger *zap.Logger) (LogManager, error) {
+	return NewLogManagerImpl(engine, store, config, logger)
 }

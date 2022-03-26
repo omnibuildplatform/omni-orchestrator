@@ -5,7 +5,10 @@ httpPort = 8080
 logFile = "./logs/info-{date}.log"
 errFile = "./logs/error-{date}.log"
 [jobManager]
+worker = 3
+syncInterval = 2
 [logManager]
+worker = 5
 [engine]
 pluginName = "kubernetes"
 configFile = "/Users/tommylike/.kube/infra-test.yaml"

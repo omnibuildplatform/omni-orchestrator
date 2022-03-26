@@ -40,18 +40,19 @@ func NewOrchestrator(config appconfig.Config, group *gin.RouterGroup, logger *za
 		return nil, errors.New(fmt.Sprintf("failed to initialize job store: %v\n", err))
 	}
 
+	logManager, err := factory.NewLogManager(jobEngine, jobStore, *app.AppConfig.LogManager, app.Logger)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to initialize log manager: %v\n", err))
+	}
+
 	jobManager, err := factory.NewJobManager(jobEngine, jobStore, *app.AppConfig.JobManager, app.Logger)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("failed to initialize job manager: %v\n", err))
 	}
 
-	//logManager, err := factory.NewLogManager(*app.AppConfig.LogManager, app.Logger)
-	//if err != nil {
-	//	return nil, errors.New(fmt.Sprintf("failed to initialize log manager: %v\n", err))
-	//}
 	return &Orchestrator{
 		jobManager:  jobManager,
-		logManager:  nil,
+		logManager:  logManager,
 		appConfig:   config,
 		routerGroup: group,
 		logger:      logger,
@@ -114,9 +115,34 @@ func (r *Orchestrator) logs(c *gin.Context) {
 	_ = jobID
 }
 
-func (r *Orchestrator) StartLoop() {
+func (r *Orchestrator) StartLoop() error {
+	if r.logManager != nil {
+		err := r.logManager.StartLoop()
+		if err != nil {
+			return err
+		}
+	}
+
+	if r.jobManager != nil {
+		//register log manger handler
+		r.jobManager.RegisterJobChangeNotifyChannel(r.logManager.GetJobChangeChannel())
+		//start up loop
+		err := r.jobManager.StartLoop()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Orchestrator) Close() {
-
+	//close job first
+	if r.jobManager != nil {
+		r.jobManager.Close()
+	}
+	r.logger.Info("job manager closed.")
+	if r.logManager != nil {
+		r.logManager.Close()
+	}
+	r.logger.Info("log manager closed.")
 }

@@ -40,7 +40,11 @@ func main() {
 		color.Error.Printf("failed to initialize orchestrator: %v\n", err)
 		os.Exit(1)
 	}
-	scheduler.StartLoop()
+	err = scheduler.StartLoop()
+	if err != nil {
+		color.Error.Printf("failed to start orchestrator loop: %v\n", err)
+		os.Exit(1)
+	}
 	color.Info.Printf("============  Begin Running(PID: %d) ============\n", os.Getpid())
 	application.Run()
 }

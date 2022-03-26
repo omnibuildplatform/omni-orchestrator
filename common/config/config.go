@@ -6,7 +6,7 @@ type (
 		ServerConfig    ServerConfig    `mapstructure:"server"`
 		LogConfig       LogConfig       `mapstructure:"log"`
 		JobManager      *JobManager     `mapstructure:"jobManager"`
-		LogManager      *LobManager     `mapstructure:"lobManager"`
+		LogManager      *LogManager     `mapstructure:"logManager"`
 		PersistentStore PersistentStore `mapstructure:"persistentStore"`
 		Engine          Engine          `mapstructure:"engine"`
 	}
@@ -22,12 +22,15 @@ type (
 
 	JobManager struct {
 		//Add meaningful option here
-		Name string `mapstructure:"name"`
+		Name         string `mapstructure:"name"`
+		Worker       int    `mapstructure:"worker"`
+		SyncInterval int    `mapstructure:"syncInterval"`
 	}
 
-	LobManager struct {
+	LogManager struct {
 		//Add meaningful option here
-		Name string `mapstructure:"name"`
+		Name   string `mapstructure:"name"`
+		Worker int    `mapstructure:"worker"`
 	}
 
 	Engine struct {
