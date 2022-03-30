@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
 	"go.uber.org/zap"
@@ -59,26 +58,46 @@ func (m *jobManagerImpl) GetName() string {
 	return ""
 }
 
-func (m *jobManagerImpl) CreateJob(ctx context.Context, job Job, kind JobKind) error {
+func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind JobKind) error {
+	var err error
+	err = m.store.CreateJob(ctx, job)
+	if err != nil {
+		m.logger.Error(fmt.Sprintf("unable to save job info %s", err))
+		return err
+	}
 	switch kind {
 	case JobImageBuild:
-		return m.createBuildISOJob(ctx, job)
+		err = m.createBuildISOJob(ctx, job)
+		break
+	}
+	if err != nil {
+		job.State = JobFailed
+		job.Detail = err.Error()
+		updateErr := m.store.UpdateJob(ctx, job)
+		if updateErr != nil {
+			m.logger.Error(fmt.Sprintf("failed to update job info into database %s", updateErr))
+		}
+		return err
+	} else {
+		job.State = JobCreated
+		updateErr := m.store.UpdateJob(ctx, job)
+		if updateErr != nil {
+			m.logger.Error(fmt.Sprintf("failed to update job info into database %s", updateErr))
+			return updateErr
+		}
 	}
 	return nil
 }
 
-func (m jobManagerImpl) createBuildISOJob(ctx context.Context, job Job) error {
+func (m jobManagerImpl) createBuildISOJob(ctx context.Context, job *Job) error {
 	var err error
 	var para = JobImageBuildPara{}
 	err = mapstructure.Decode(job.Spec, &para)
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to decode job specification %s", err))
 	}
-	//create record
-	job.ID = uuid.New().String()
-	//start up job
-	//update job information
 	return m.engine.BuildOSImage(ctx, job, para)
+
 }
 
 func (m *jobManagerImpl) jobSupported(kind JobKind) bool {
@@ -105,8 +124,8 @@ func (m *jobManagerImpl) AcceptableJob(ctx context.Context, job Job) JobKind {
 func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID string) error {
 	return nil
 }
-func (m *jobManagerImpl) GetJob(ctx context.Context, jobID string) Job {
-	return Job{}
+func (m *jobManagerImpl) GetJob(ctx context.Context, service, task, domain, jobID string) (Job, error) {
+	return m.store.GetJob(ctx, service, task, domain, jobID)
 }
 func (m *jobManagerImpl) Close() {
 	m.closed = true
@@ -178,9 +197,10 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobEvent) {
 			if err != nil {
 				m.logger.Warn(fmt.Sprintf("failed to get job %s/%s information %s", job.Domain, job.ID, err))
 			} else {
-				fmt.Println(*jobRes)
-				//Update db
-				//Notify log manager
+				err := m.store.UpdateJob(context.TODO(), jobRes)
+				if err != nil {
+					m.logger.Error(fmt.Sprintf("failed to update job status to store due to: %s", err))
+				}
 				m.jobChangeListener.Notify(*jobRes)
 			}
 		}

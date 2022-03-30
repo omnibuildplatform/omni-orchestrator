@@ -45,3 +45,7 @@ docker-build:
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+
+## Prepare cassandra
+cassandra:
+	./scripts/prepare-database.sh

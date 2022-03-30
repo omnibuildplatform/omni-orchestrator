@@ -1,16 +1,25 @@
-CREATE TABLE jobs_info(
+CREATE TYPE IF NOT EXISTS omni_orchestrator.step_info(
+    step_id                 int,
+    name                    text,
+    state                   text,
+    started_time            timestamp,
+    finished_time           timestamp,
+    message                 text,
+);
+
+CREATE TABLE IF NOT EXISTS omni_orchestrator.job_info(
   service                   text,
-  domain                    text,
   task                      text,
+  domain                    text,
+  job_date                  date,
+  job_id                    timeuuid,
   user_id                   text,
-  job_id                    uuid,
-  max_attempts              int,
-  task_timeout              int,
+  engine                    text,
   spec                      blob,
   started_time              timestamp,
   finished_time             timestamp,
-  state                     int,  -- enum Created, Running, Succeed, Failed, Timeout,
-  task_result               text,
-  failure_detail            blob,
-  PRIMARY KEY  ((service, domain, task), job_id)
+  state                     text,  -- enum Created, Running, Succeed, Failed,
+  steps                     frozen<list<step_info>>,
+  detail                    text,
+  PRIMARY KEY  ((service, task), domain, job_date, job_id)
 );

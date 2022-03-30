@@ -1,4 +1,4 @@
-package cadence
+package cassandra
 
 import (
 	"context"

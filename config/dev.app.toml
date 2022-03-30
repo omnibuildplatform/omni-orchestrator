@@ -17,3 +17,7 @@ OmniRepoAddress = "http://omni-repository.omni-repository.svc.cluster.local/data
 OmniRepoToken = "316462d0c029ba707ad2"
 [persistentStore]
 pluginName = "cassandra"
+hosts = "127.0.0.1"
+port = 9042
+keyspace = "omni_orchestrator"
+protoVersion = 0

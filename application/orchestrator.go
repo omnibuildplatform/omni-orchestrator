@@ -63,9 +63,8 @@ func NewOrchestrator(config appconfig.Config, group *gin.RouterGroup, logger *za
 func (r *Orchestrator) Initialize() error {
 	r.routerGroup.POST("/", r.createJob)
 	r.routerGroup.GET("/", r.queryJob)
-	r.routerGroup.GET("/:jobID", r.getJob)
-	r.routerGroup.DELETE("/:jobID", r.deleteJob)
-	r.routerGroup.POST("/:jobID/logs", r.logs)
+	r.routerGroup.DELETE("/", r.deleteJob)
+	r.routerGroup.POST("/logs", r.logs)
 	return nil
 
 }
@@ -88,7 +87,7 @@ func (r *Orchestrator) createJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "job spec empty"})
 		return
 	}
-	err = r.jobManager.CreateJob(context.TODO(), job, jobKind)
+	err = r.jobManager.CreateJob(context.TODO(), &job, jobKind)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -97,7 +96,20 @@ func (r *Orchestrator) createJob(c *gin.Context) {
 }
 
 func (r *Orchestrator) queryJob(c *gin.Context) {
-
+	service := c.Query("service")
+	task := c.Query("task")
+	domain := c.Query("domain")
+	jobID := c.Query("jobID")
+	if domain == "" || service == "" || task == "" || jobID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required parameter"})
+		return
+	}
+	job, err := r.jobManager.GetJob(context.TODO(), service, task, domain, jobID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, job)
 }
 
 func (r *Orchestrator) getJob(c *gin.Context) {

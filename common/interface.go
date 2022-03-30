@@ -46,27 +46,25 @@ type (
 
 	JobEvent struct {
 		Service string
+		Task    string
 		Domain  string
 		ID      string
-		UserID  string
-		Task    string
 	}
 
 	Job struct {
-		Service       string                 `json:"service" binding:"required"`
-		Domain        string                 `json:"domain" binding:"required"`
-		ID            string                 `json:"id"`
-		UserID        string                 `json:"userID" binding:"required"`
-		Task          string                 `json:"task" binding:"required"`
-		Spec          map[string]interface{} `json:"spec"`
-		Engine        string                 `json:"engine" binding:"required"`
-		StartTime     time.Time              `json:"startTime"`
-		EndTime       time.Time              `json:"endTime"`
-		State         JobState               `json:"state"`
-		JobResult     string                 `json:"jobResult"`
-		FailureDetail string                 `json:"failureDetail"`
-		Duration      int                    `json:"duration"`
-		Steps         []Step                 `json:"steps"`
+		Service   string                 `json:"service" binding:"required"`
+		Task      string                 `json:"task" binding:"required"`
+		Domain    string                 `json:"domain" binding:"required"`
+		ID        string                 `json:"id"`
+		UserID    string                 `json:"userID" binding:"required"`
+		Spec      map[string]interface{} `json:"spec"`
+		Engine    string                 `json:"engine" binding:"required"`
+		StartTime time.Time              `json:"startTime"`
+		EndTime   time.Time              `json:"endTime"`
+		State     JobState               `json:"state"`
+		Duration  int                    `json:"duration"`
+		Steps     []Step                 `json:"steps"`
+		Detail    string                 `json:"detail"`
 	}
 
 	Step struct {
@@ -76,7 +74,6 @@ type (
 		StartTime time.Time `json:"startTime"`
 		EndTime   time.Time `json:"endTime"`
 		Message   string    `json:"message"`
-		LogUrl    string    `json:"logUrl"`
 	}
 
 	Closeable interface {
@@ -98,10 +95,10 @@ type (
 	JobManager interface {
 		Closeable
 		GetName() string
-		CreateJob(ctx context.Context, j Job, kind JobKind) error
+		CreateJob(ctx context.Context, j *Job, kind JobKind) error
 		AcceptableJob(ctx context.Context, j Job) JobKind
 		DeleteJob(ctx context.Context, jobID string) error
-		GetJob(ctx context.Context, jobID string) Job
+		GetJob(ctx context.Context, service, task, domain, jobID string) (Job, error)
 		StartLoop() error
 		RegisterJobChangeNotifyChannel(ch chan<- Job)
 	}
@@ -118,7 +115,7 @@ type (
 		Initialize() error
 		GetName() string
 		GetSupportedJobs() []JobKind
-		BuildOSImage(ctx context.Context, job Job, spec JobImageBuildPara) error
+		BuildOSImage(ctx context.Context, job *Job, spec JobImageBuildPara) error
 		GetJob(ctx context.Context, domain, jobID string) (*Job, error)
 		StartLoop() error
 		GetJobEventChannel() <-chan JobEvent
@@ -129,6 +126,8 @@ type (
 		Closeable
 		Initialize() error
 		GetName() string
-		CreateJob(ctx context.Context, job *Job) (string, error)
+		CreateJob(ctx context.Context, job *Job) error
+		UpdateJob(ctx context.Context, job *Job) error
+		GetJob(ctx context.Context, service, task, domain, jobID string) (Job, error)
 	}
 )

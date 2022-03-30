@@ -1,4 +1,4 @@
-package cadence
+package cassandra
 
 import (
 	"github.com/omnibuildplatform/omni-orchestrator/common"
@@ -20,10 +20,9 @@ func init() {
 }
 
 func (p *plugin) CreateJobStore(cfg appconfig.PersistentStore, logger *zap.Logger) (common.JobStore, error) {
-	//e, err := NewJobStore(cfg, logger)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//return e, nil
-	return &Store{}, nil
+	e, err := NewJobStore(cfg, logger)
+	if err != nil {
+		return nil, err
+	}
+	return e, nil
 }

@@ -29,7 +29,6 @@ const (
 	AppLabelKey               = "omni-orchestrator"
 	AppLabelValue             = "true"
 	AnnotationService         = "omni-tag/service"
-	AnnotationUser            = "omni-tag/user"
 	AnnotationDomain          = "omni-tag/domain"
 	AnnotationTask            = "omni-tag/task"
 	DefaultSyncInterval       = 3
@@ -135,7 +134,7 @@ func (e *Engine) GetSupportedJobs() []common.JobKind {
 	return []common.JobKind{common.JobImageBuild}
 }
 
-func (e *Engine) prepareJobConfigmap(job common.Job, spec common.JobImageBuildPara) (string, error) {
+func (e *Engine) prepareJobConfigmap(job *common.Job, spec common.JobImageBuildPara) (string, error) {
 	pkg := BuildImagePackages{
 		Packages: spec.Packages,
 	}
@@ -176,12 +175,11 @@ func (e *Engine) prepareJobConfigmap(job common.Job, spec common.JobImageBuildPa
 	return "", err
 }
 
-func (e *Engine) generateSystemAnnotations(job common.Job) map[string]string {
+func (e *Engine) generateSystemAnnotations(job *common.Job) map[string]string {
 	return map[string]string{
 		AnnotationService: job.Service,
-		AnnotationUser:    job.UserID,
-		AnnotationDomain:  job.Domain,
 		AnnotationTask:    job.Task,
+		AnnotationDomain:  job.Domain,
 	}
 }
 
@@ -190,7 +188,7 @@ func (e *Engine) generateSystemLabels() map[string]string {
 		AppLabelKey: AppLabelValue,
 	}
 }
-func (e *Engine) generateBuildOSImageJob(job common.Job, spec common.JobImageBuildPara, configmapName string) *batchv1.Job {
+func (e *Engine) generateBuildOSImageJob(job *common.Job, spec common.JobImageBuildPara, configmapName string) *batchv1.Job {
 	jobTTLSecondsAfterFinished := int32(DefaultJobTTL)
 	jobRetry := int32(DefaultJobRetry)
 	privileged := true
@@ -296,7 +294,7 @@ func (e *Engine) ConvertToNamespace(domain string) string {
 	return strings.ToLower(domain)
 }
 
-func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.JobImageBuildPara) error {
+func (e *Engine) BuildOSImage(ctx context.Context, job *common.Job, spec common.JobImageBuildPara) error {
 	var err error
 	//prepare namespace
 	err = e.CreateNamespaceIfNeeded(e.ConvertToNamespace(job.Domain))
@@ -325,6 +323,32 @@ func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.J
 		return nil
 	}
 	return err
+}
+
+func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[string]string) (string, string, string) {
+	var service, task, domain string
+	if value, ok := annotations[AnnotationService]; !ok {
+		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
+			namespace, name, AnnotationService))
+		service = ""
+	} else {
+		service = value
+	}
+	if value, ok := annotations[AnnotationTask]; !ok {
+		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
+			namespace, name, AnnotationTask))
+		task = ""
+	} else {
+		task = value
+	}
+	if value, ok := annotations[AnnotationDomain]; !ok {
+		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
+			namespace, name, AnnotationDomain))
+		domain = ""
+	} else {
+		domain = value
+	}
+	return service, task, domain
 }
 
 func (e *Engine) GetJob(ctx context.Context, domain, jobID string) (*common.Job, error) {
@@ -361,6 +385,8 @@ func (e *Engine) GetJob(ctx context.Context, domain, jobID string) (*common.Job,
 				}
 			}
 		}
+		jobResource.Service, jobResource.Task, jobResource.Domain = e.collectJobAnnotations(
+			domain, jobID, existing.Annotations)
 		//append steps
 		jobResource.Steps = e.CollectSteps(existing)
 		return &jobResource, nil
@@ -409,34 +435,7 @@ func (e *Engine) CollectSteps(job *batchv1.Job) []common.Step {
 func (e *Engine) TriggerJobEvent(namespace, name string, annotations map[string]string) {
 	event := common.JobEvent{}
 	event.ID = name
-	if value, ok := annotations[AnnotationDomain]; !ok {
-		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
-			namespace, name, AnnotationDomain))
-		return
-	} else {
-		event.Domain = value
-	}
-	if value, ok := annotations[AnnotationUser]; !ok {
-		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
-			namespace, name, AnnotationUser))
-		return
-	} else {
-		event.UserID = value
-	}
-	if value, ok := annotations[AnnotationService]; !ok {
-		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
-			namespace, name, AnnotationService))
-		return
-	} else {
-		event.Service = value
-	}
-	if value, ok := annotations[AnnotationTask]; !ok {
-		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
-			namespace, name, AnnotationTask))
-		return
-	} else {
-		event.Task = value
-	}
+	event.Service, event.Task, event.Domain = e.collectJobAnnotations(namespace, name, annotations)
 	e.eventChannel <- event
 }
 
