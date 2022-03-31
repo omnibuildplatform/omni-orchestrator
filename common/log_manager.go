@@ -6,18 +6,24 @@ import (
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
 	"go.uber.org/zap"
 	"io"
+	"strconv"
 	"sync"
+	"time"
 )
 
 const (
-	JobStepID      = "%s/%s"
-	JobLogReadSize = 8 * 1024
-	JobChannelSize = 100
+	JobStepID           = "%s/%s"
+	JobLogReadSize      = 8 * 1024
+	JobChannelSize      = 100
+	JobLogStoreInterval = 10
 )
 
 type JobStepInfo struct {
+	Service  string
+	Task     string
 	Domain   string
-	JobName  string
+	JobID    string
+	StepID   string
 	StepName string
 }
 
@@ -86,13 +92,19 @@ func (l *logManagerImpl) FetchRunningSteps() {
 			}
 			for _, step := range job.Steps {
 				if step.State != StepCreated {
-					identity := fmt.Sprintf(JobStepID, job.ID, step.Name)
-					if _, loaded := l.jobLogMap.LoadOrStore(identity, identity); !loaded {
-						//start to collect job step logs
-						l.stepLogCh <- JobStepInfo{
-							Domain:   job.Domain,
-							JobName:  job.ID,
-							StepName: step.Name,
+					//skip finished jobs
+					if !l.store.JobStepLogFinished(context.TODO(), job.Service, job.Task, job.Domain, job.ID, strconv.Itoa(step.Index)) {
+						identity := fmt.Sprintf(JobStepID, job.ID, step.Name)
+						if _, loaded := l.jobLogMap.LoadOrStore(identity, identity); !loaded {
+							//start to collect job step logs
+							l.stepLogCh <- JobStepInfo{
+								Service:  job.Service,
+								Task:     job.Task,
+								Domain:   job.Domain,
+								JobID:    job.ID,
+								StepID:   strconv.Itoa(step.Index),
+								StepName: step.Name,
+							}
 						}
 					}
 				}
@@ -110,45 +122,84 @@ func (l *logManagerImpl) SyncJobSteplog(ctx context.Context, index int, ch chan 
 				l.logger.Info(fmt.Sprintf("channel closed: log sync worker %d will quit", index))
 				return
 			} else {
-				logReader, err := l.engine.FetchJobStepLog(ctx, jobStep.Domain, jobStep.JobName, jobStep.StepName)
+				logReader, err := l.engine.FetchJobStepLog(ctx, jobStep.Domain, jobStep.JobID, jobStep.StepName)
 				if err != nil {
-					l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobName, err))
+					l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobID, err))
 				} else {
-					err = l.ReadJobStepLog(ctx, logReader)
+					err = l.ReadJobStepLog(ctx, jobStep, logReader)
 					if err != nil {
-						l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobName, err))
+						l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobID, err))
 					}
 				}
 			}
-			l.jobLogMap.Delete(fmt.Sprintf(JobStepID, jobStep.JobName, jobStep.StepName))
+			l.jobLogMap.Delete(fmt.Sprintf(JobStepID, jobStep.JobID, jobStep.StepID))
 		}
 	}
 }
 
-func (l *logManagerImpl) ReadJobStepLog(context context.Context, reader io.ReadCloser) error {
+func (l *logManagerImpl) GetJobStepLogs(ctx context.Context, service, task, domain, jobID, stepID string, startTime string) (*JobLogPart, error) {
+	return l.store.GetJobStepLogs(ctx, service, task, domain, jobID, stepID, startTime)
+}
+
+func (l *logManagerImpl) InsertLogPart(context context.Context, jobStep JobStepInfo, data []byte, logTime time.Time) {
+	log := JobStepLog{
+		Service: jobStep.Service,
+		Task:    jobStep.Task,
+		Domain:  jobStep.Domain,
+		JobID:   jobStep.JobID,
+		StepID:  jobStep.StepID,
+		LogTime: logTime,
+		Data:    data,
+	}
+	err := l.store.InsertJobStepLog(context, &log)
+	if err != nil {
+		l.logger.Error(fmt.Sprintf("failed to insert job log into job store: %s", err))
+	}
+	l.logger.Info(fmt.Sprintf("job: %s/%s %d log data saved into log store", jobStep.JobID, jobStep.StepName, len(data)))
+}
+
+func (l *logManagerImpl) ReadJobStepLog(context context.Context, jobStep JobStepInfo, reader io.ReadCloser) error {
 	defer reader.Close()
+	var logs []byte
+	ticker := time.NewTicker(JobLogStoreInterval * time.Second)
 	for {
 		select {
+		case <-ticker.C:
+			if len(logs) == 0 {
+				break
+			}
+			logsData := make([]byte, len(logs))
+			copy(logsData, logs)
+			logTime := time.Now().Add(time.Duration(JobLogStoreInterval) * time.Second * -1)
+			logs = []byte{}
+			go l.InsertLogPart(context, jobStep, logsData, logTime)
 		case <-context.Done():
 			l.logger.Info("context canceled, sync job will quit")
-			return nil
+			goto LASTLOG
 		default:
 			buf := make([]byte, JobLogReadSize)
 			numBytes, err := reader.Read(buf)
 			if numBytes == 0 {
-				return nil
+				goto LASTLOG
 			}
 			if err == io.EOF {
-				return nil
+				goto LASTLOG
 			}
 			if err != nil {
-				return err
+				l.logger.Error(fmt.Sprintf("failed to collect logs for job %s/%s, err %s", jobStep.JobID, jobStep.StepID, err))
+				goto LASTLOG
 			}
-			message := string(buf[:numBytes])
-			fmt.Println(message)
-			//Save into db
+			logs = append(logs, buf[:numBytes]...)
 		}
 	}
+LASTLOG:
+	l.logger.Info(fmt.Sprintf("collect job step %s/%s log finished", jobStep.JobID, jobStep.StepID))
+	if len(logs) != 0 {
+		go l.InsertLogPart(context, jobStep, logs, time.Now())
+	}
+	//Append finished log
+	go l.InsertLogPart(context, jobStep, []byte(LogCompleteFlag), time.Now())
+	return nil
 }
 
 func (l *logManagerImpl) GetJobChangeChannel() chan<- Job {

@@ -12,6 +12,12 @@ import (
 	"github.com/omnibuildplatform/omni-orchestrator/common/store"
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
+)
+
+const (
+	LogTimeUUIDHeader  = "logTimeUUID"
+	LogCompletedHeader = "logCompleted"
 )
 
 type Orchestrator struct {
@@ -123,8 +129,27 @@ func (r *Orchestrator) deleteJob(c *gin.Context) {
 }
 
 func (r *Orchestrator) logs(c *gin.Context) {
-	jobID := c.Param("jobID")
-	_ = jobID
+	service := c.Query("service")
+	task := c.Query("task")
+	domain := c.Query("domain")
+	jobID := c.Query("jobID")
+	stepID := c.Query("stepID")
+	startTime := c.Query("startTime")
+	if domain == "" || service == "" || task == "" || jobID == "" || stepID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required parameter"})
+		return
+	}
+	logPart, err := r.logManager.GetJobStepLogs(context.TODO(), service, task, domain, jobID, stepID, startTime)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to collect step logs %s", err)})
+		return
+	}
+	//additional headers
+	if len(logPart.Data) != 0 {
+		c.Header(LogTimeUUIDHeader, logPart.MaxJobTimeUUID)
+		c.Header(LogCompletedHeader, strconv.FormatBool(logPart.Finished))
+	}
+	c.Data(http.StatusOK, "text/plain", logPart.Data)
 }
 
 func (r *Orchestrator) StartLoop() error {

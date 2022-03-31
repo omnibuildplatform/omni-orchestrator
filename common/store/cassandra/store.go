@@ -13,9 +13,13 @@ import (
 )
 
 const (
+	MaxJobStepLogRecord    = 20
 	InsertJobQueryTemplate = `INSERT INTO job_info (` +
 		`service, task, domain, job_date, job_id, user_id, engine, spec, started_time, finished_time, state, steps, detail) ` +
 		`VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS`
+	InsertJobStepLogQueryTemplate = `INSERT INTO log_info (` +
+		`service, task, domain, job_id, step_id, log_time, data) ` +
+		`VALUES(?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS`
 	UpdateJobQueryTemplate = `UPDATE job_info ` +
 		`SET started_time = ?, ` +
 		`finished_time = ?, ` +
@@ -35,6 +39,25 @@ const (
 		`and domain = ? ` +
 		`and job_date = ? ` +
 		`and job_id = ?`
+
+	GetJobLogQueryTemplate = `SELECT log_time, data ` +
+		`FROM log_info ` +
+		`WHERE service = ? ` +
+		`and task = ? ` +
+		`and domain = ? ` +
+		`and job_id = ? ` +
+		`and step_id = ?` +
+		`and log_time > ?` +
+		`LIMIT ?`
+
+	GetJobLastLogQueryTemplate = `SELECT data ` +
+		`FROM log_info ` +
+		`WHERE service = ? ` +
+		`and task = ? ` +
+		`and domain = ? ` +
+		`and job_id = ? ` +
+		`and step_id = ?` +
+		`ORDER BY log_time DESC LIMIT 1`
 )
 
 type Store struct {
@@ -103,6 +126,19 @@ func (s *Store) UpdateJob(ctx context.Context, job *common.Job) error {
 	}
 	return nil
 
+}
+
+func (s *Store) InsertJobStepLog(ctx context.Context, log *common.JobStepLog) error {
+	query := s.session.Query(InsertJobStepLogQueryTemplate, log.Service, log.Task, log.Domain, log.JobID,
+		log.StepID, gocql.UUIDFromTime(log.LogTime).String(), log.Data).WithContext(ctx)
+	applied, err := query.MapScanCAS(make(map[string]interface{}))
+	if err != nil {
+		return err
+	}
+	if !applied {
+		return fmt.Errorf("insert job log operation failed")
+	}
+	return nil
 }
 func (s *Store) CreateJob(ctx context.Context, job *common.Job) error {
 	job.ID = gocql.TimeUUID().String()
@@ -226,4 +262,55 @@ func (s *Store) collectJobSteps(dbSteps []map[string]interface{}) []common.Step 
 		steps = append(steps, step)
 	}
 	return steps
+}
+
+func (s *Store) JobStepLogFinished(ctx context.Context, service string, task string, domain string, jobID string, stepID string) bool {
+	query := s.session.Query(GetJobLastLogQueryTemplate, service, task, domain, jobID, stepID).WithContext(context.TODO())
+	iter := query.Iter()
+	if iter == nil {
+		s.logger.Error(fmt.Sprintf("unable to fetch job %s/%s last log information", jobID, stepID))
+		return false
+	}
+	var jobLog []byte
+	for iter.Scan(&jobLog) {
+		if string(jobLog) == common.LogCompleteFlag {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Store) GetJobStepLogs(ctx context.Context, service string, task string, domain string, jobID string, stepID string, startTime string) (*common.JobLogPart, error) {
+	logPart := common.JobLogPart{
+		Finished: false,
+		Data:     []byte{},
+	}
+	var startUUID string
+	if len(startTime) == 0 {
+		startUUID = gocql.MinTimeUUID(time.Now().Add(-1 * time.Minute * 60 * 24 * 365)).String()
+	} else {
+		uuid, err := gocql.ParseUUID(startTime)
+		if err != nil {
+			s.logger.Error(fmt.Sprintf("unable to parse job step log time %s", err))
+			return &logPart, errors.New(fmt.Sprintf("unable to parse job step log time %s", err))
+		} else {
+			startUUID = uuid.String()
+		}
+	}
+	query := s.session.Query(GetJobLogQueryTemplate, service, task, domain, jobID, stepID, startUUID, MaxJobStepLogRecord).WithContext(context.TODO())
+	iter := query.Iter()
+	if iter == nil {
+		return &logPart, errors.New("query job logs operation failed.  Not able to create query iterator")
+	}
+	var jobLog []byte
+	var jobTime string
+	for iter.Scan(&jobTime, &jobLog) {
+		if string(jobLog) == common.LogCompleteFlag {
+			logPart.Finished = true
+		} else {
+			logPart.Data = append(logPart.Data, jobLog...)
+		}
+	}
+	logPart.MaxJobTimeUUID = jobTime
+	return &logPart, nil
 }

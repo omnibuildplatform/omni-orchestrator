@@ -17,6 +17,10 @@ const (
 	JobFailed  JobState = "JobFailed"
 )
 
+const (
+	LogCompleteFlag = "0F80573E-61DA-4C1B-9CDE-396F139D63DD"
+)
+
 type StepState string
 
 const (
@@ -76,6 +80,22 @@ type (
 		Message   string    `json:"message"`
 	}
 
+	JobStepLog struct {
+		Service string
+		Task    string
+		Domain  string
+		JobID   string
+		StepID  string
+		LogTime time.Time
+		Data    []byte
+	}
+
+	JobLogPart struct {
+		Data           []byte
+		MaxJobTimeUUID string
+		Finished       bool
+	}
+
 	Closeable interface {
 		Close()
 	}
@@ -108,6 +128,7 @@ type (
 		GetName() string
 		StartLoop() error
 		GetJobChangeChannel() chan<- Job
+		GetJobStepLogs(ctx context.Context, service, task, domain, jobID, stepID string, startTime string) (*JobLogPart, error)
 	}
 
 	JobEngine interface {
@@ -129,5 +150,8 @@ type (
 		CreateJob(ctx context.Context, job *Job) error
 		UpdateJob(ctx context.Context, job *Job) error
 		GetJob(ctx context.Context, service, task, domain, jobID string) (Job, error)
+		InsertJobStepLog(ctx context.Context, log *JobStepLog) error
+		GetJobStepLogs(ctx context.Context, service, task, domain, jobID, stepID string, startTime string) (*JobLogPart, error)
+		JobStepLogFinished(ctx context.Context, service string, task string, domain string, jobID string, stepID string) bool
 	}
 )
