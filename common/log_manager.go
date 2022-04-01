@@ -93,7 +93,7 @@ func (l *logManagerImpl) FetchRunningSteps() {
 			for _, step := range job.Steps {
 				if step.State != StepCreated {
 					//skip finished jobs
-					if !l.store.JobStepLogFinished(context.TODO(), job.Service, job.Task, job.Domain, job.ID, strconv.Itoa(step.Index)) {
+					if !l.store.JobStepLogFinished(context.TODO(), job.JobIdentity, strconv.Itoa(step.ID)) {
 						identity := fmt.Sprintf(JobStepID, job.ID, step.Name)
 						if _, loaded := l.jobLogMap.LoadOrStore(identity, identity); !loaded {
 							//start to collect job step logs
@@ -102,7 +102,7 @@ func (l *logManagerImpl) FetchRunningSteps() {
 								Task:     job.Task,
 								Domain:   job.Domain,
 								JobID:    job.ID,
-								StepID:   strconv.Itoa(step.Index),
+								StepID:   strconv.Itoa(step.ID),
 								StepName: step.Name,
 							}
 						}
@@ -137,16 +137,18 @@ func (l *logManagerImpl) SyncJobSteplog(ctx context.Context, index int, ch chan 
 	}
 }
 
-func (l *logManagerImpl) GetJobStepLogs(ctx context.Context, service, task, domain, jobID, stepID string, startTime string) (*JobLogPart, error) {
-	return l.store.GetJobStepLogs(ctx, service, task, domain, jobID, stepID, startTime)
+func (l *logManagerImpl) GetJobStepLogs(ctx context.Context, jobID JobIdentity, stepID string, startTime string, maxRecord int) (*JobLogPart, error) {
+	return l.store.GetJobStepLogs(ctx, jobID, stepID, startTime, maxRecord)
 }
 
 func (l *logManagerImpl) InsertLogPart(context context.Context, jobStep JobStepInfo, data []byte, logTime time.Time) {
 	log := JobStepLog{
-		Service: jobStep.Service,
-		Task:    jobStep.Task,
-		Domain:  jobStep.Domain,
-		JobID:   jobStep.JobID,
+		JobIdentity: JobIdentity{
+			Service: jobStep.Service,
+			Task:    jobStep.Task,
+			Domain:  jobStep.Domain,
+			ID:      jobStep.JobID,
+		},
 		StepID:  jobStep.StepID,
 		LogTime: logTime,
 		Data:    data,

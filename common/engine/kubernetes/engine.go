@@ -58,7 +58,7 @@ type Engine struct {
 	config       appconfig.Engine
 	factory      *informers.SharedInformerFactory
 	closeCh      chan struct{}
-	eventChannel chan common.JobEvent
+	eventChannel chan common.JobIdentity
 	JobWatchMap  sync.Map
 }
 
@@ -81,7 +81,7 @@ func NewEngine(config appconfig.Engine, logger *zap.Logger) (common.JobEngine, e
 		clientSet:    clientSet,
 		factory:      &factory,
 		closeCh:      make(chan struct{}),
-		eventChannel: make(chan common.JobEvent, DefaultEventChannel),
+		eventChannel: make(chan common.JobIdentity, DefaultEventChannel),
 		JobWatchMap:  sync.Map{},
 	}, nil
 }
@@ -351,12 +351,11 @@ func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[s
 	return service, task, domain
 }
 
-func (e *Engine) GetJob(ctx context.Context, domain, jobID string) (*common.Job, error) {
+func (e *Engine) GetJob(ctx context.Context, jobID common.JobIdentity) (*common.Job, error) {
 	jobResource := common.Job{
-		ID:     jobID,
-		Domain: domain,
+		JobIdentity: jobID,
 	}
-	existing, err := e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(domain)).Get(context.TODO(), jobID, metav1.GetOptions{})
+	existing, err := e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(jobID.Domain)).Get(context.TODO(), jobID.ID, metav1.GetOptions{})
 	if err == nil {
 		completionRequired := existing.Spec.Completions
 		backoffLimitRequired := existing.Spec.BackoffLimit
@@ -386,7 +385,7 @@ func (e *Engine) GetJob(ctx context.Context, domain, jobID string) (*common.Job,
 			}
 		}
 		jobResource.Service, jobResource.Task, jobResource.Domain = e.collectJobAnnotations(
-			domain, jobID, existing.Annotations)
+			jobID.Domain, jobID.ID, existing.Annotations)
 		//append steps
 		jobResource.Steps = e.CollectSteps(existing)
 		return &jobResource, nil
@@ -409,8 +408,8 @@ func (e *Engine) CollectSteps(job *batchv1.Job) []common.Step {
 	// Job will only execute once
 	for i, container := range pods.Items[0].Status.InitContainerStatuses {
 		step := common.Step{
-			Index: i + 1,
-			Name:  container.Name,
+			ID:   i + 1,
+			Name: container.Name,
 		}
 		if container.State.Terminated != nil {
 			step.StartTime = container.State.Terminated.StartedAt.Time
@@ -433,7 +432,7 @@ func (e *Engine) CollectSteps(job *batchv1.Job) []common.Step {
 }
 
 func (e *Engine) TriggerJobEvent(namespace, name string, annotations map[string]string) {
-	event := common.JobEvent{}
+	event := common.JobIdentity{}
 	event.ID = name
 	event.Service, event.Task, event.Domain = e.collectJobAnnotations(namespace, name, annotations)
 	e.eventChannel <- event
@@ -512,7 +511,7 @@ func (e *Engine) StartLoop() error {
 	return nil
 }
 
-func (e *Engine) GetJobEventChannel() <-chan common.JobEvent {
+func (e *Engine) GetJobEventChannel() <-chan common.JobIdentity {
 	return e.eventChannel
 }
 

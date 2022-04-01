@@ -106,7 +106,7 @@ func (s *Store) UpdateJob(ctx context.Context, job *common.Job) error {
 	if job != nil {
 		for _, step := range job.Steps {
 			value := make(map[string]interface{})
-			value["step_id"] = step.Index
+			value["step_id"] = step.ID
 			value["name"] = step.Name
 			value["state"] = step.State
 			value["started_time"] = step.StartTime.UnixMilli()
@@ -129,7 +129,7 @@ func (s *Store) UpdateJob(ctx context.Context, job *common.Job) error {
 }
 
 func (s *Store) InsertJobStepLog(ctx context.Context, log *common.JobStepLog) error {
-	query := s.session.Query(InsertJobStepLogQueryTemplate, log.Service, log.Task, log.Domain, log.JobID,
+	query := s.session.Query(InsertJobStepLogQueryTemplate, log.Service, log.Task, log.Domain, log.ID,
 		log.StepID, gocql.UUIDFromTime(log.LogTime).String(), log.Data).WithContext(ctx)
 	applied, err := query.MapScanCAS(make(map[string]interface{}))
 	if err != nil {
@@ -151,7 +151,7 @@ func (s *Store) CreateJob(ctx context.Context, job *common.Job) error {
 	if job != nil {
 		for _, step := range job.Steps {
 			value := make(map[string]interface{})
-			value["step_id"] = step.Index
+			value["step_id"] = step.ID
 			value["name"] = step.Name
 			value["state"] = step.State
 			value["started_time"] = step.StartTime.UnixMilli()
@@ -172,22 +172,19 @@ func (s *Store) CreateJob(ctx context.Context, job *common.Job) error {
 	return nil
 }
 
-func (s *Store) GetJob(ctx context.Context, service, task, domain, jobID string) (common.Job, error) {
-	jobTime, err := gocql.ParseUUID(jobID)
+func (s *Store) GetJob(ctx context.Context, jobID common.JobIdentity) (common.Job, error) {
+	jobTime, err := gocql.ParseUUID(jobID.ID)
 	if err != nil {
 		return common.Job{}, errors.New(fmt.Sprintf("unable to parse job id %s", err.Error()))
 	}
 	jobDate := jobTime.Time().Format("2006-01-02")
-	query := s.session.Query(GetJobQueryTemplate, service, task, domain, jobDate, jobID).WithContext(context.TODO())
+	query := s.session.Query(GetJobQueryTemplate, jobID.Service, jobID.Task, jobID.Domain, jobDate, jobID.ID).WithContext(context.TODO())
 	result := make(map[string]interface{})
 	if err := query.MapScan(result); err != nil {
 		return common.Job{}, err
 	}
 	job := common.Job{
-		Service: service,
-		Task:    task,
-		Domain:  domain,
-		ID:      jobID,
+		JobIdentity: jobID,
 	}
 	if value, ok := (result["user_id"]).(string); ok {
 		job.UserID = value
@@ -254,7 +251,7 @@ func (s *Store) collectJobSteps(dbSteps []map[string]interface{}) []common.Step 
 			step.Name = value
 		}
 		if value, ok := (ss["step_id"]).(int); ok {
-			step.Index = value
+			step.ID = value
 		}
 		if value, ok := (ss["state"]).(string); ok {
 			step.State = common.StepState(value)
@@ -264,8 +261,8 @@ func (s *Store) collectJobSteps(dbSteps []map[string]interface{}) []common.Step 
 	return steps
 }
 
-func (s *Store) JobStepLogFinished(ctx context.Context, service string, task string, domain string, jobID string, stepID string) bool {
-	query := s.session.Query(GetJobLastLogQueryTemplate, service, task, domain, jobID, stepID).WithContext(context.TODO())
+func (s *Store) JobStepLogFinished(ctx context.Context, jobID common.JobIdentity, stepID string) bool {
+	query := s.session.Query(GetJobLastLogQueryTemplate, jobID.Service, jobID.Task, jobID.Domain, jobID.ID, stepID).WithContext(context.TODO())
 	iter := query.Iter()
 	if iter == nil {
 		s.logger.Error(fmt.Sprintf("unable to fetch job %s/%s last log information", jobID, stepID))
@@ -280,7 +277,7 @@ func (s *Store) JobStepLogFinished(ctx context.Context, service string, task str
 	return false
 }
 
-func (s *Store) GetJobStepLogs(ctx context.Context, service string, task string, domain string, jobID string, stepID string, startTime string) (*common.JobLogPart, error) {
+func (s *Store) GetJobStepLogs(ctx context.Context, jobID common.JobIdentity, stepID string, startTime string, maxRecord int) (*common.JobLogPart, error) {
 	logPart := common.JobLogPart{
 		Finished: false,
 		Data:     []byte{},
@@ -297,7 +294,10 @@ func (s *Store) GetJobStepLogs(ctx context.Context, service string, task string,
 			startUUID = uuid.String()
 		}
 	}
-	query := s.session.Query(GetJobLogQueryTemplate, service, task, domain, jobID, stepID, startUUID, MaxJobStepLogRecord).WithContext(context.TODO())
+	if maxRecord <= 0 {
+		maxRecord = MaxJobStepLogRecord
+	}
+	query := s.session.Query(GetJobLogQueryTemplate, jobID.Service, jobID.Task, jobID.Domain, jobID.ID, stepID, startUUID, maxRecord).WithContext(context.TODO())
 	iter := query.Iter()
 	if iter == nil {
 		return &logPart, errors.New("query job logs operation failed.  Not able to create query iterator")

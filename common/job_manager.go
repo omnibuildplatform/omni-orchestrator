@@ -124,8 +124,8 @@ func (m *jobManagerImpl) AcceptableJob(ctx context.Context, job Job) JobKind {
 func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID string) error {
 	return nil
 }
-func (m *jobManagerImpl) GetJob(ctx context.Context, service, task, domain, jobID string) (Job, error) {
-	return m.store.GetJob(ctx, service, task, domain, jobID)
+func (m *jobManagerImpl) GetJob(ctx context.Context, jobID JobIdentity) (Job, error) {
+	return m.store.GetJob(ctx, jobID)
 }
 func (m *jobManagerImpl) Close() {
 	m.closed = true
@@ -143,7 +143,7 @@ func (m *jobManagerImpl) StartLoop() error {
 		return errors.New("task engine is empty")
 	}
 	eventChannel := m.engine.GetJobEventChannel()
-	flushChannel := make(chan JobEvent)
+	flushChannel := make(chan JobIdentity)
 	// SyncRequestReduce used to reduce job query count
 	go m.SyncRequestReduce(flushChannel, eventChannel)
 	m.logger.Info(fmt.Sprintf("starting to initialzie %d job manager worker(s) to sync job status.",
@@ -159,9 +159,9 @@ func (m *jobManagerImpl) StartLoop() error {
 	return nil
 }
 
-func (m *jobManagerImpl) SyncRequestReduce(flush chan<- JobEvent, ch <-chan JobEvent) {
+func (m *jobManagerImpl) SyncRequestReduce(flush chan<- JobIdentity, ch <-chan JobIdentity) {
 	ticker := time.NewTicker(time.Duration(m.config.SyncInterval) * time.Second)
-	jobEventMap := make(map[string]JobEvent, 1000)
+	jobEventMap := make(map[string]JobIdentity, 1000)
 	for {
 		select {
 		case job, ok := <-ch:
@@ -179,12 +179,12 @@ func (m *jobManagerImpl) SyncRequestReduce(flush chan<- JobEvent, ch <-chan JobE
 			for _, e := range jobEventMap {
 				flush <- e
 			}
-			jobEventMap = make(map[string]JobEvent, 1000)
+			jobEventMap = make(map[string]JobIdentity, 1000)
 		}
 	}
 }
 
-func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobEvent) {
+func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 	for {
 		select {
 		case job, ok := <-ch:
@@ -193,7 +193,7 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobEvent) {
 				return
 			}
 			m.logger.Info(fmt.Sprintf("worker %d received job %s/%s change event", index, job.Domain, job.ID))
-			jobRes, err := m.engine.GetJob(context.TODO(), job.Domain, job.ID)
+			jobRes, err := m.engine.GetJob(context.TODO(), job)
 			if err != nil {
 				m.logger.Warn(fmt.Sprintf("failed to get job %s/%s information %s", job.Domain, job.ID, err))
 			} else {

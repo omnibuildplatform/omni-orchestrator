@@ -48,21 +48,18 @@ type (
 		Architecture string   `json:"architecture"`
 	}
 
-	JobEvent struct {
-		Service string
-		Task    string
-		Domain  string
-		ID      string
+	JobIdentity struct {
+		Service string `json:"service"`
+		Task    string `json:"task" `
+		Domain  string `json:"domain"`
+		ID      string `json:"id"`
 	}
 
 	Job struct {
-		Service   string                 `json:"service" binding:"required"`
-		Task      string                 `json:"task" binding:"required"`
-		Domain    string                 `json:"domain" binding:"required"`
-		ID        string                 `json:"id"`
-		UserID    string                 `json:"userID" binding:"required"`
+		JobIdentity
+		UserID    string                 `json:"userID"`
 		Spec      map[string]interface{} `json:"spec"`
-		Engine    string                 `json:"engine" binding:"required"`
+		Engine    string                 `json:"engine"`
 		StartTime time.Time              `json:"startTime"`
 		EndTime   time.Time              `json:"endTime"`
 		State     JobState               `json:"state"`
@@ -72,7 +69,7 @@ type (
 	}
 
 	Step struct {
-		Index     int       `json:"index"`
+		ID        int       `json:"id"`
 		Name      string    `json:"name"`
 		State     StepState `json:"state"`
 		StartTime time.Time `json:"startTime"`
@@ -81,10 +78,7 @@ type (
 	}
 
 	JobStepLog struct {
-		Service string
-		Task    string
-		Domain  string
-		JobID   string
+		JobIdentity
 		StepID  string
 		LogTime time.Time
 		Data    []byte
@@ -118,7 +112,7 @@ type (
 		CreateJob(ctx context.Context, j *Job, kind JobKind) error
 		AcceptableJob(ctx context.Context, j Job) JobKind
 		DeleteJob(ctx context.Context, jobID string) error
-		GetJob(ctx context.Context, service, task, domain, jobID string) (Job, error)
+		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
 		StartLoop() error
 		RegisterJobChangeNotifyChannel(ch chan<- Job)
 	}
@@ -128,7 +122,7 @@ type (
 		GetName() string
 		StartLoop() error
 		GetJobChangeChannel() chan<- Job
-		GetJobStepLogs(ctx context.Context, service, task, domain, jobID, stepID string, startTime string) (*JobLogPart, error)
+		GetJobStepLogs(ctx context.Context, jobID JobIdentity, stepID string, startTime string, maxRecord int) (*JobLogPart, error)
 	}
 
 	JobEngine interface {
@@ -137,9 +131,9 @@ type (
 		GetName() string
 		GetSupportedJobs() []JobKind
 		BuildOSImage(ctx context.Context, job *Job, spec JobImageBuildPara) error
-		GetJob(ctx context.Context, domain, jobID string) (*Job, error)
+		GetJob(ctx context.Context, jobID JobIdentity) (*Job, error)
 		StartLoop() error
-		GetJobEventChannel() <-chan JobEvent
+		GetJobEventChannel() <-chan JobIdentity
 		FetchJobStepLog(ctx context.Context, domain, jobID, stepName string) (io.ReadCloser, error)
 	}
 
@@ -149,9 +143,9 @@ type (
 		GetName() string
 		CreateJob(ctx context.Context, job *Job) error
 		UpdateJob(ctx context.Context, job *Job) error
-		GetJob(ctx context.Context, service, task, domain, jobID string) (Job, error)
+		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
 		InsertJobStepLog(ctx context.Context, log *JobStepLog) error
-		GetJobStepLogs(ctx context.Context, service, task, domain, jobID, stepID string, startTime string) (*JobLogPart, error)
-		JobStepLogFinished(ctx context.Context, service string, task string, domain string, jobID string, stepID string) bool
+		GetJobStepLogs(ctx context.Context, jobID JobIdentity, stepID, startTime string, maxRecord int) (*JobLogPart, error)
+		JobStepLogFinished(ctx context.Context, jobID JobIdentity, stepID string) bool
 	}
 )
