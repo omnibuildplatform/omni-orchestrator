@@ -26,6 +26,40 @@
                     }
                 }
             }
+        },
+        "/jobs": {
+            "post": {
+                "description": "Create a job with specified SPEC",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Job"
+                ],
+                "summary": "Create Job",
+                "parameters": [
+                    {
+                        "description": "body for create a job",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/application.CreateJobRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/common.Job"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -39,6 +73,109 @@
                     "type": "string"
                 },
                 "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "application.CreateJobRequest": {
+            "type": "object",
+            "required": [
+                "domain",
+                "engine",
+                "service",
+                "spec",
+                "task",
+                "userID"
+            ],
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "engine": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "spec": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "task": {
+                    "type": "string"
+                },
+                "userID": {
+                    "type": "string"
+                }
+            }
+        },
+        "common.Job": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "engine": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "spec": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/common.Step"
+                    }
+                },
+                "task": {
+                    "type": "string"
+                },
+                "userID": {
+                    "type": "string"
+                }
+            }
+        },
+        "common.Step": {
+            "type": "object",
+            "properties": {
+                "endTime": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "state": {
                     "type": "string"
                 }
             }

@@ -8,6 +8,76 @@ definitions:
       tag:
         type: string
     type: object
+  application.CreateJobRequest:
+    properties:
+      domain:
+        type: string
+      engine:
+        type: string
+      service:
+        type: string
+      spec:
+        additionalProperties: true
+        type: object
+      task:
+        type: string
+      userID:
+        type: string
+    required:
+    - domain
+    - engine
+    - service
+    - spec
+    - task
+    - userID
+    type: object
+  common.Job:
+    properties:
+      detail:
+        type: string
+      domain:
+        type: string
+      duration:
+        type: integer
+      endTime:
+        type: string
+      engine:
+        type: string
+      id:
+        type: string
+      service:
+        type: string
+      spec:
+        additionalProperties: true
+        type: object
+      startTime:
+        type: string
+      state:
+        type: string
+      steps:
+        items:
+          $ref: '#/definitions/common.Step'
+        type: array
+      task:
+        type: string
+      userID:
+        type: string
+    type: object
+  common.Step:
+    properties:
+      endTime:
+        type: string
+      id:
+        type: integer
+      message:
+        type: string
+      name:
+        type: string
+      startTime:
+        type: string
+      state:
+        type: string
+    type: object
   controller.ApplicationStatus:
     properties:
       info:
@@ -33,4 +103,26 @@ paths:
       summary: Application health
       tags:
       - Status
+  /jobs:
+    post:
+      consumes:
+      - application/json
+      description: Create a job with specified SPEC
+      parameters:
+      - description: body for create a job
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.CreateJobRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/common.Job'
+      summary: Create Job
+      tags:
+      - Job
 swagger: "2.0"

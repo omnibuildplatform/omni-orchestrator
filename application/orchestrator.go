@@ -132,6 +132,17 @@ func (r *Orchestrator) Initialize() error {
 
 }
 
+// @BasePath /v1/
+
+// CreateJob godoc
+// @Summary Create Job
+// @Param	body	body 	CreateJobRequest	true		"body for create a job"
+// @Description Create a job with specified SPEC
+// @Tags Job
+// @Accept json
+// @Produce json
+// @Success 201 object common.Job
+// @Router /jobs [post]
 func (r *Orchestrator) createJob(c *gin.Context) {
 	//parameter validation
 	var jobCreate CreateJobRequest

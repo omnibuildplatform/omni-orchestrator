@@ -10,7 +10,7 @@ type ApplicationStatus struct {
 	Info   app.ApplicationInfo
 }
 
-// @BasePath /api/v1
+// @BasePath /v1
 
 // AppHealth godoc
 // @Summary Application health
