@@ -104,6 +104,41 @@ paths:
       tags:
       - Status
   /jobs:
+    get:
+      consumes:
+      - application/json
+      description: Query job status with identity
+      parameters:
+      - description: job service type
+        in: query
+        name: service
+        required: true
+        type: string
+      - description: job task type
+        in: query
+        name: task
+        required: true
+        type: string
+      - description: job domain type
+        in: query
+        name: domain
+        required: true
+        type: string
+      - description: job ID
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.Job'
+      summary: Query Job Status
+      tags:
+      - Job
     post:
       consumes:
       - application/json
@@ -123,6 +158,53 @@ paths:
           schema:
             $ref: '#/definitions/common.Job'
       summary: Create Job
+      tags:
+      - Job
+  /jobs/logs:
+    get:
+      consumes:
+      - application/json
+      description: Query job status with identity
+      parameters:
+      - description: job service type
+        in: query
+        name: service
+        required: true
+        type: string
+      - description: job task type
+        in: query
+        name: task
+        required: true
+        type: string
+      - description: job domain type
+        in: query
+        name: domain
+        required: true
+        type: string
+      - description: job ID
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: job StepID
+        in: query
+        name: stepID
+        required: true
+        type: string
+      - description: Step log start time
+        in: query
+        name: startTimeUUID
+        type: string
+      - description: max record to retrieve
+        in: query
+        name: maxRecord
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: ""
+      summary: Query Job Logs
       tags:
       - Job
 swagger: "2.0"

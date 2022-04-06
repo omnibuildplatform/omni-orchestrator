@@ -136,7 +136,7 @@ func (r *Orchestrator) Initialize() error {
 
 // CreateJob godoc
 // @Summary Create Job
-// @Param	body	body 	CreateJobRequest	true		"body for create a job"
+// @Param body body CreateJobRequest true "body for create a job"
 // @Description Create a job with specified SPEC
 // @Tags Job
 // @Accept json
@@ -176,6 +176,20 @@ func (r *Orchestrator) createJob(c *gin.Context) {
 	c.JSON(http.StatusCreated, job)
 }
 
+// @BasePath /v1/
+
+// QueryJobStatus godoc
+// @Summary Query Job Status
+// @Param service query  string	true	"job service type"
+// @Param task	query  string	true	"job task type"
+// @Param domain query  string	true	"job domain type"
+// @Param id query  string	true	"job ID"
+// @Description Query job status with identity
+// @Tags Job
+// @Accept json
+// @Produce json
+// @Success 200 object common.Job
+// @Router /jobs [get]
 func (r *Orchestrator) queryJob(c *gin.Context) {
 	var jobQuery QueryJobRequest
 	var err error
@@ -205,6 +219,23 @@ func (r *Orchestrator) deleteJob(c *gin.Context) {
 	_ = jobID
 }
 
+// @BasePath /v1/
+
+// QueryJobStepLogs godoc
+// @Summary Query Job Logs
+// @Param service query  string	true	"job service type"
+// @Param task	query  string	true	"job task type"
+// @Param domain query  string	true	"job domain type"
+// @Param id query  string	true	"job ID"
+// @Param stepID query  string	true	"job StepID"
+// @Param startTimeUUID	query  string	false	"Step log start time"
+// @Param maxRecord	query  string	false	"max record to retrieve"
+// @Description Query job status with identity
+// @Tags Job
+// @Accept json
+// @Produce text/plain
+// @Success 200
+// @Router /jobs/logs [get]
 func (r *Orchestrator) logs(c *gin.Context) {
 	var jobStep QueryJobStepLogRequest
 	var err error

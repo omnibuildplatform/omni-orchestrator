@@ -40,6 +40,57 @@ const docTemplate = `{
             }
         },
         "/jobs": {
+            "get": {
+                "description": "Query job status with identity",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Job"
+                ],
+                "summary": "Query Job Status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "job service type",
+                        "name": "service",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "job task type",
+                        "name": "task",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "job domain type",
+                        "name": "domain",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "job ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/common.Job"
+                        }
+                    }
+                }
+            },
             "post": {
                 "description": "Create a job with specified SPEC",
                 "consumes": [
@@ -69,6 +120,75 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/common.Job"
                         }
+                    }
+                }
+            }
+        },
+        "/jobs/logs": {
+            "get": {
+                "description": "Query job status with identity",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Job"
+                ],
+                "summary": "Query Job Logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "job service type",
+                        "name": "service",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "job task type",
+                        "name": "task",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "job domain type",
+                        "name": "domain",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "job ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "job StepID",
+                        "name": "stepID",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Step log start time",
+                        "name": "startTimeUUID",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "max record to retrieve",
+                        "name": "maxRecord",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
                     }
                 }
             }
