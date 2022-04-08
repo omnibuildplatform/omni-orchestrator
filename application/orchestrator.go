@@ -258,7 +258,7 @@ func (r *Orchestrator) logs(c *gin.Context) {
 		c.Header(LogCompletedHeader, strconv.FormatBool(logPart.Finished))
 		c.Data(http.StatusOK, "text/plain", logPart.Data)
 	} else {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "job log not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "job log not found"})
 	}
 
 }

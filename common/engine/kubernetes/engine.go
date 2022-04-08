@@ -45,7 +45,9 @@ installer_configs: /etc/omni-imager/installer_assets/calamares-configs
 systemd_configs: /etc/omni-imager/installer_assets/systemd-configs
 init_script: /etc/omni-imager/init
 installer_script: /etc/omni-imager/runinstaller
-repo_file: /etc/omni-imager/repos/%s.repo`
+repo_file: /etc/omni-imager/repos/%s.repo
+use_cached_rootfs: True
+cached_rootfs_gz: /data/rootfs_cache/rootfs.tar.gz`
 )
 
 type BuildImagePackages struct {
@@ -220,7 +222,22 @@ func (e *Engine) generateBuildOSImageJob(job *common.Job, spec common.JobImageBu
 					},
 					InitContainers: []v1.Container{
 						{
-							Name:  "01-image-build",
+							Name:  "rootfs-download",
+							Image: "alpine/curl",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      fmt.Sprintf("%s-data", job.ID),
+									MountPath: "/data/",
+								},
+							},
+							Command: []string{
+								"sh", "-c", fmt.Sprintf(
+									"mkdir -p /data/rootfs_cache; curl -vvv %s/data/browse/util/imager/rootfs.tar.gz -o /data/rootfs_cache/rootfs.tar.gz",
+									e.config.OmniRepoAddress),
+							},
+						},
+						{
+							Name:  "image-build",
 							Image: e.config.ImageTagForOSImageBuild,
 							SecurityContext: &v1.SecurityContext{
 								Privileged: &privileged,
@@ -250,7 +267,7 @@ func (e *Engine) generateBuildOSImageJob(job *common.Job, spec common.JobImageBu
 							},
 						},
 						{
-							Name:  "02-image-upload",
+							Name:  "image-upload",
 							Image: "alpine/curl",
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -261,7 +278,8 @@ func (e *Engine) generateBuildOSImageJob(job *common.Job, spec common.JobImageBu
 							Command: []string{
 								"curl", "-vvv", fmt.Sprintf("-Ffile=@/data/omni-workspace/openEuler-%s.iso", job.ID),
 								fmt.Sprintf("-Fproject=%s", spec.Version), "-FfileType=image",
-								fmt.Sprintf("%s?token=%s", e.config.OmniRepoAddress, e.config.OmniRepoToken),
+								fmt.Sprintf("/data/upload%s?token=%s", strings.TrimRight(e.config.OmniRepoAddress,
+									"/"), e.config.OmniRepoToken),
 							},
 						},
 					},
@@ -291,7 +309,7 @@ func (e *Engine) generateBuildOSImageJob(job *common.Job, spec common.JobImageBu
 }
 
 func (e *Engine) ConvertToNamespace(domain string) string {
-	return strings.ToLower(domain)
+	return strings.Replace(strings.ToLower(domain), ".", "-", -1)
 }
 
 func (e *Engine) BuildOSImage(ctx context.Context, job *common.Job, spec common.JobImageBuildPara) error {

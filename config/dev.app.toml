@@ -12,8 +12,8 @@ worker = 5
 [engine]
 pluginName = "kubernetes"
 configFile = "/Users/tommylike/.kube/infra-test.yaml"
-imageTagForOSImageBuild = "tommylike/omni-worker:0.1.4"
-OmniRepoAddress = "http://omni-repository.omni-repository.svc.cluster.local/data/upload"
+imageTagForOSImageBuild = "tommylike/omni-worker:0.2.1"
+OmniRepoAddress = "http://omni-repository.omni-repository.svc.cluster.local"
 OmniRepoToken = "316462d0c029ba707ad2"
 [persistentStore]
 pluginName = "cassandra"
