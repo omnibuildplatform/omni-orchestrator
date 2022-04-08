@@ -9,6 +9,7 @@ worker = 3
 syncInterval = 2
 [logManager]
 worker = 5
+ttl = 2592000
 [engine]
 pluginName = "kubernetes"
 configFile = "/Users/tommylike/.kube/infra-test.yaml"

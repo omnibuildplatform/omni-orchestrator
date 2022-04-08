@@ -144,7 +144,7 @@ type (
 		CreateJob(ctx context.Context, job *Job) error
 		UpdateJob(ctx context.Context, job *Job) error
 		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
-		InsertJobStepLog(ctx context.Context, log *JobStepLog) error
+		InsertJobStepLog(ctx context.Context, log *JobStepLog, ttl int64) error
 		GetJobStepLogs(ctx context.Context, jobID JobIdentity, stepID, startTime string, maxRecord int) (*JobLogPart, error)
 		JobStepLogFinished(ctx context.Context, jobID JobIdentity, stepID string) bool
 	}

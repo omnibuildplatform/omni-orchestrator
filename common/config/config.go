@@ -28,9 +28,10 @@ type (
 	}
 
 	LogManager struct {
-		//Add meaningful option here
 		Name   string `mapstructure:"name"`
 		Worker int    `mapstructure:"worker"`
+		//TTL for log record in the format of second
+		TTL int64 `mapstructure:"ttl"`
 	}
 
 	Engine struct {

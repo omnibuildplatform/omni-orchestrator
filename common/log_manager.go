@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	DefaultJobTTL       = 60 * 60 * 24 * 7
 	JobStepID           = "%s/%s"
 	JobLogReadSize      = 8 * 1024
 	JobChannelSize      = 100
@@ -39,9 +40,16 @@ type logManagerImpl struct {
 	stepLogCh   chan JobStepInfo
 	//Job logs are split into steps
 	jobLogMap sync.Map
+	jobTTL    int64
 }
 
 func NewLogManagerImpl(engine JobEngine, store JobStore, config appconfig.LogManager, logger *zap.Logger) (LogManager, error) {
+	var jobTTL int64
+	if config.TTL == 0 {
+		jobTTL = DefaultJobTTL
+	} else {
+		jobTTL = config.TTL
+	}
 	return &logManagerImpl{
 		engine:      engine,
 		logger:      logger,
@@ -51,6 +59,7 @@ func NewLogManagerImpl(engine JobEngine, store JobStore, config appconfig.LogMan
 		closed:      false,
 		jobChangeCh: make(chan Job, JobChannelSize),
 		stepLogCh:   make(chan JobStepInfo, JobChannelSize),
+		jobTTL:      jobTTL,
 	}, nil
 }
 
@@ -153,7 +162,7 @@ func (l *logManagerImpl) InsertLogPart(context context.Context, jobStep JobStepI
 		LogTime: logTime,
 		Data:    data,
 	}
-	err := l.store.InsertJobStepLog(context, &log)
+	err := l.store.InsertJobStepLog(context, &log, l.jobTTL)
 	if err != nil {
 		l.logger.Error(fmt.Sprintf("failed to insert job log into job store: %s", err))
 	}

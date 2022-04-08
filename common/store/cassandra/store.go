@@ -19,7 +19,7 @@ const (
 		`VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS`
 	InsertJobStepLogQueryTemplate = `INSERT INTO log_info (` +
 		`service, task, domain, job_id, step_id, log_time, data) ` +
-		`VALUES(?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS`
+		`VALUES(?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS USING TTL ?`
 	UpdateJobQueryTemplate = `UPDATE job_info ` +
 		`SET started_time = ?, ` +
 		`finished_time = ?, ` +
@@ -128,9 +128,9 @@ func (s *Store) UpdateJob(ctx context.Context, job *common.Job) error {
 
 }
 
-func (s *Store) InsertJobStepLog(ctx context.Context, log *common.JobStepLog) error {
+func (s *Store) InsertJobStepLog(ctx context.Context, log *common.JobStepLog, ttl int64) error {
 	query := s.session.Query(InsertJobStepLogQueryTemplate, log.Service, log.Task, log.Domain, log.ID,
-		log.StepID, gocql.UUIDFromTime(log.LogTime).String(), log.Data).WithContext(ctx)
+		log.StepID, gocql.UUIDFromTime(log.LogTime).String(), log.Data, ttl).WithContext(ctx)
 	applied, err := query.MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		return err
