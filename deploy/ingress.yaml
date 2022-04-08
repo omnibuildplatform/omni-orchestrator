@@ -1,21 +1,21 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: omni-repository-ingress
+  name: omni-orchestrator-ingress
 spec:
   rules:
-    - host: repo.test.osinfra.cn
+    - host: log.test.osinfra.cn
       http:
         paths:
           - backend:
               service:
-                name: omni-repository
+                name: omni-orchestrator
                 port:
                   number: 80
             path: /
             pathType: ImplementationSpecific
   tls:
     - hosts:
-        - repo.test.osinfra.cn
-      secretName: omni-repo-secret
+        - log.test.osinfra.cn
+      secretName: omni-orchestrator-secret
 

@@ -1,22 +1,54 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name: omni-repository
-rules: []
+  name: omni-orchestrator
+rules:
+  - apiGroups:
+    - ""
+    resources:
+      - pods
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - configmaps
+    verbs:
+      - get
+      - create
+      - list
+      - watch
+      - delete
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
 ---
 kind: ServiceAccount
 apiVersion: v1
 metadata:
-  name: omni-repository
+  name: omni-orchestrator
 ---
-kind: RoleBinding
+kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: omni-repository
+  name: omni-orchestrator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: omni-repository
+  kind: ClusterRole
+  name: omni-orchestrator
 subjects:
   - kind: ServiceAccount
-    name: omni-repository
+    name: omni-orchestrator

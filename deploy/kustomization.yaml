@@ -2,14 +2,18 @@ resources:
 - namespace.yaml
 - deployment.yaml
 - service.yaml
-- pvc.yaml
 - config.yaml
 - rbac.yaml
+- pvc.yaml
 - ingress.yaml
 commonLabels:
+  app: omni-orchestrator-server
   owner: tommylike
-  app: omni-repository-server
 commonAnnotations:
   email: tommylikehu@gmail.com
-namespace: omni-repository
-
+namespace: omni-orchestrator
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: opensourceway/omni-orchestrator
+  newTag: 960aa021baf3f021d0bdca3df7fd310405aa982d

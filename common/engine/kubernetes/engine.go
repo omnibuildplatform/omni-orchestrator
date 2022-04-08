@@ -278,7 +278,7 @@ func (e *Engine) generateBuildOSImageJob(job *common.Job, spec common.JobImageBu
 							Command: []string{
 								"curl", "-vvv", fmt.Sprintf("-Ffile=@/data/omni-workspace/openEuler-%s.iso", job.ID),
 								fmt.Sprintf("-Fproject=%s", spec.Version), "-FfileType=image",
-								fmt.Sprintf("/data/upload%s?token=%s", strings.TrimRight(e.config.OmniRepoAddress,
+								fmt.Sprintf("%s/data/upload?token=%s", strings.TrimRight(e.config.OmniRepoAddress,
 									"/"), e.config.OmniRepoToken),
 							},
 						},

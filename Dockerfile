@@ -4,7 +4,7 @@ LABEL maintainer="tommylike<tommylikehu@gmail.com>"
 WORKDIR /app
 COPY . /app
 RUN go mod download
-RUN swag init && CGO_ENABLED=0 go build -o omni-orchestrator
+RUN CGO_ENABLED=0 go build -o omni-orchestrator
 
 FROM alpine/git:v2.30.2
 ARG user=app

@@ -49,3 +49,7 @@ docker-push:
 ## Prepare cassandra
 cassandra:
 	./scripts/prepare-database.sh
+
+## update deploy yaml
+deploy-update:
+	cd ./deploy && kustomize edit set image ${IMG}

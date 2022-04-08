@@ -1,30 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: omni-repository
+  name: omni-orchestrator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: omni-repository-server
+      component: omni-orchestrator-server
   template:
     metadata:
       labels:
-        component: omni-repository-server
+        component: omni-orchestrator-server
     spec:
+      initContainers:
+        - name: init-cassandra
+          image: busybox:1.28
+          command: [ "sh", "-c", "until nslookup omni-cassandra.omni-orchestrator.svc.cluster.local; do echo waiting for cassandra service ; sleep 2; done;" ]
       containers:
-        - image: tommylike/omni-repository:0.0.1
+        - image: opensourceway/omni-orchestrator:960aa021baf3f021d0bdca3df7fd310405aa982d
           imagePullPolicy: Always
-          name: omni-repository-server
+          name: omni-orchestrator-server
           livenessProbe:
             httpGet:
-              path: "/health"
+              path: "/v1/health"
               port: 8080
-            initialDelaySeconds: 3
+            initialDelaySeconds: 10
             periodSeconds: 5
           readinessProbe:
             httpGet:
-              path: "/health"
+              path: "/v1/health"
               port: 8080
             initialDelaySeconds: 20
             failureThreshold: 1
@@ -32,28 +36,67 @@ spec:
             timeoutSeconds: 10
           resources:
             requests:
-              cpu: 1000m
-              memory: 1000Mi
+              cpu: 2000m
+              memory: 2000Mi
           ports:
             - containerPort: 8080
               name: http
               protocol: TCP
-          env:
-            - name: APP_ENV
-              value: "prod"
-            - name: UPLOAD_TOKEN
-              value: "316462d0c029ba707ad2"
           volumeMounts:
-            - mountPath: /app/data
-              name: data-volume
             - mountPath: /app/config/app.toml
               name: config-volume
               subPath: app.toml
-      serviceAccountName: omni-repository
+      serviceAccountName: omni-orchestrator
+      volumes:
+        - name: config-volume
+          configMap:
+            name: omni-orchestrator-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omni-cassandra
+spec:
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      component: omni-cassandra-server
+  template:
+    metadata:
+      labels:
+        component: omni-cassandra-server
+    spec:
+      containers:
+        - image: cassandra:4.0
+          imagePullPolicy: Always
+          name: omni-cassandra-server
+          livenessProbe:
+            tcpSocket:
+              port: 9042
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 9042
+            initialDelaySeconds: 20
+            failureThreshold: 3
+            periodSeconds: 5
+            timeoutSeconds: 10
+          resources:
+            requests:
+              cpu: 4000m
+              memory: 4000Mi
+          ports:
+            - containerPort: 9042
+              name: db
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/cassandra
+              name: data-volume
+      serviceAccountName: omni-orchestrator
       volumes:
         - name: data-volume
           persistentVolumeClaim:
-            claimName: omni-repository-data
-        - name: config-volume
-          configMap:
-            name: omni-repository-config
+            claimName: omni-orchestrator-data
