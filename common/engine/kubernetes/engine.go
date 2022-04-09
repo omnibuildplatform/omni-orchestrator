@@ -147,13 +147,10 @@ func (e *Engine) prepareJobConfigmap(job *common.Job, spec common.JobImageBuildP
 	//prepare configmap
 	configMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            job.ID,
-			Namespace:       e.ConvertToNamespace(job.Domain),
-			Annotations:     e.generateSystemAnnotations(job),
-			Labels:          e.generateSystemLabels(),
-			OwnerReferences: []metav1.OwnerReference{
-				//TODO: Add job reference
-			},
+			Name:        job.ID,
+			Namespace:   e.ConvertToNamespace(job.Domain),
+			Annotations: e.generateSystemAnnotations(job),
+			Labels:      e.generateSystemLabels(),
 		},
 		Data: map[string]string{
 			DefaultPackagesConfigFile: string(packages),
@@ -183,6 +180,17 @@ func (e *Engine) generateSystemAnnotations(job *common.Job) map[string]string {
 		AnnotationTask:    job.Task,
 		AnnotationDomain:  job.Domain,
 	}
+}
+
+func (e *Engine) hasSystemAnnotations(annotations map[string]string) bool {
+	if _, ok := annotations[AnnotationService]; ok {
+		if _, ok := annotations[AnnotationTask]; ok {
+			if _, ok := annotations[AnnotationDomain]; ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (e *Engine) generateSystemLabels() map[string]string {
@@ -411,6 +419,16 @@ func (e *Engine) GetJob(ctx context.Context, jobID common.JobIdentity) (*common.
 	return nil, err
 }
 
+func (e *Engine) DeleteJobRelatedResource(namespace, name string) {
+	//delete configmap
+	err := e.clientSet.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		e.logger.Warn(fmt.Sprintf("Unable to delete job %s/%s related configmap %s", namespace, name, err))
+	} else {
+		e.logger.Info(fmt.Sprintf("Job %s/%s related configmap has been deleted", namespace, name))
+	}
+}
+
 func (e *Engine) CollectSteps(job *batchv1.Job) []common.Step {
 	var steps []common.Step
 	pods, err := e.clientSet.CoreV1().Pods(job.Namespace).List(context.TODO(), metav1.ListOptions{
@@ -495,26 +513,79 @@ func (e *Engine) PodUpdateEvent(old interface{}, new interface{}) {
 	}
 }
 
+func (e *Engine) ConfigmapAddEvent(obj interface{}) {
+	configmap := obj.(*v1.ConfigMap)
+	//delete orphan configmap
+	if _, ok := e.JobWatchMap.Load(configmap.Name); !ok {
+		_, err := e.clientSet.BatchV1().Jobs(configmap.Namespace).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
+		if err != nil && errors.IsNotFound(err) {
+			err = e.clientSet.CoreV1().ConfigMaps(configmap.Namespace).Delete(context.TODO(),
+				configmap.Name, metav1.DeleteOptions{})
+			if err != nil {
+				e.logger.Warn(fmt.Sprintf("Unable to delete orphan configmap %s/%s, error %s.",
+					configmap.Namespace, configmap.Name, err))
+			} else {
+				e.logger.Info(fmt.Sprintf("orphan configmap found, %s/%s delete it.", configmap.Namespace, configmap.Name))
+			}
+		}
+	}
+}
+
 func (e *Engine) JobDeleteEvent(obj interface{}) {
 	job := obj.(*batchv1.Job)
 	e.logger.Info(fmt.Sprintf("job %s/%s has been deleted", job.Namespace, job.Name))
+	//remove job related resource
+	e.DeleteJobRelatedResource(job.Namespace, job.Name)
 	e.JobWatchMap.Delete(job.Name)
+}
+
+func (e *Engine) engineControlledFilter(obj interface{}) bool {
+	job, ok := obj.(*batchv1.Job)
+	if ok {
+		return e.hasSystemAnnotations(job.Annotations)
+	}
+	pod, ok := obj.(*v1.Pod)
+	if ok {
+		return e.hasSystemAnnotations(pod.Annotations)
+	}
+	configmap, ok := obj.(*v1.ConfigMap)
+	if ok {
+		return e.hasSystemAnnotations(configmap.Annotations)
+	}
+	return false
 }
 
 func (e *Engine) StartLoop() error {
 	jobInformers := (*e.factory).Batch().V1().Jobs().Informer()
 	podInformers := (*e.factory).Core().V1().Pods().Informer()
-	jobInformers.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    e.JobAddEvent,
-		UpdateFunc: e.JobUpdateEvent,
-		DeleteFunc: e.JobDeleteEvent,
+	configmapInformers := (*e.factory).Core().V1().ConfigMaps().Informer()
+	jobInformers.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: e.engineControlledFilter,
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc:    e.JobAddEvent,
+			UpdateFunc: e.JobUpdateEvent,
+			DeleteFunc: e.JobDeleteEvent,
+		},
 	})
 	//Watch pod used for init container changes
-	podInformers.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: e.PodUpdateEvent,
+	podInformers.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: e.engineControlledFilter,
+		Handler: cache.ResourceEventHandlerFuncs{
+			UpdateFunc: e.PodUpdateEvent,
+		},
 	})
+	//Watch configmap used for cleanup
+	configmapInformers.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: e.engineControlledFilter,
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: e.ConfigmapAddEvent,
+		},
+	})
+
 	go jobInformers.Run(e.closeCh)
 	go podInformers.Run(e.closeCh)
+	go configmapInformers.Run(e.closeCh)
+
 	if !cache.WaitForCacheSync(e.closeCh, jobInformers.HasSynced) {
 		runtime.HandleError(fmt.Errorf("timed out waiting for job caches to sync"))
 		close(e.closeCh)
@@ -524,6 +595,11 @@ func (e *Engine) StartLoop() error {
 		runtime.HandleError(fmt.Errorf("timed out waiting for pod caches to sync"))
 		close(e.closeCh)
 		return fmt.Errorf("timed out waiting for pod caches to sync")
+	}
+	if !cache.WaitForCacheSync(e.closeCh, configmapInformers.HasSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for configmap caches to sync"))
+		close(e.closeCh)
+		return fmt.Errorf("timed out waiting for configmap caches to sync")
 	}
 	e.logger.Info("kubernetes engine loop started")
 	return nil
