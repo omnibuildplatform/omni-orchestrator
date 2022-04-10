@@ -135,6 +135,18 @@ func (l *logManagerImpl) SyncJobSteplog(ctx context.Context, index int, ch chan 
 				if err != nil {
 					l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobID, err))
 				} else {
+					//hacky code here to delete all logs regarding this job step
+					l.logger.Info(fmt.Sprintf("job step %s/%s log will be cleared.", jobStep.JobID, jobStep.StepID))
+					stepLog := JobStepLog{
+						JobIdentity: JobIdentity{
+							Service: jobStep.Service,
+							Task:    jobStep.Task,
+							Domain:  jobStep.Domain,
+							ID:      jobStep.JobID,
+						},
+						StepID: jobStep.StepID,
+					}
+					err = l.store.DeleteJobStepLog(ctx, &stepLog)
 					err = l.ReadJobStepLog(ctx, jobStep, logReader)
 					if err != nil {
 						l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobID, err))

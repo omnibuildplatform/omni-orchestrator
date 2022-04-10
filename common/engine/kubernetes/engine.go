@@ -516,16 +516,19 @@ func (e *Engine) PodUpdateEvent(old interface{}, new interface{}) {
 func (e *Engine) ConfigmapAddEvent(obj interface{}) {
 	configmap := obj.(*v1.ConfigMap)
 	//delete orphan configmap
-	if _, ok := e.JobWatchMap.Load(configmap.Name); !ok {
-		_, err := e.clientSet.BatchV1().Jobs(configmap.Namespace).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
-			err = e.clientSet.CoreV1().ConfigMaps(configmap.Namespace).Delete(context.TODO(),
-				configmap.Name, metav1.DeleteOptions{})
-			if err != nil {
-				e.logger.Warn(fmt.Sprintf("Unable to delete orphan configmap %s/%s, error %s.",
-					configmap.Namespace, configmap.Name, err))
-			} else {
-				e.logger.Info(fmt.Sprintf("orphan configmap found, %s/%s delete it.", configmap.Namespace, configmap.Name))
+	//all configmap created one hour before will take into account
+	if configmap.CreationTimestamp.Time.Before(time.Now().Add(-1 * time.Minute * 60)) {
+		if _, ok := e.JobWatchMap.Load(configmap.Name); !ok {
+			_, err := e.clientSet.BatchV1().Jobs(configmap.Namespace).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
+			if err != nil && errors.IsNotFound(err) {
+				err = e.clientSet.CoreV1().ConfigMaps(configmap.Namespace).Delete(context.TODO(),
+					configmap.Name, metav1.DeleteOptions{})
+				if err != nil {
+					e.logger.Warn(fmt.Sprintf("Unable to delete orphan configmap %s/%s, error %s.",
+						configmap.Namespace, configmap.Name, err))
+				} else {
+					e.logger.Info(fmt.Sprintf("orphan configmap found, %s/%s delete it.", configmap.Namespace, configmap.Name))
+				}
 			}
 		}
 	}

@@ -20,6 +20,14 @@ const (
 	InsertJobStepLogQueryTemplate = `INSERT INTO log_info (` +
 		`service, task, domain, job_id, step_id, log_time, data) ` +
 		`VALUES(?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS USING TTL ?`
+
+	DeleteJobStepLogQueryTemplate = `DELETE FROM log_info ` +
+		`WHERE service = ? ` +
+		`and task = ? ` +
+		`and domain = ? ` +
+		`and job_id = ? ` +
+		`and step_id = ?`
+
 	UpdateJobQueryTemplate = `UPDATE job_info ` +
 		`SET started_time = ?, ` +
 		`finished_time = ?, ` +
@@ -139,6 +147,12 @@ func (s *Store) InsertJobStepLog(ctx context.Context, log *common.JobStepLog, tt
 		return fmt.Errorf("insert job log operation failed")
 	}
 	return nil
+}
+
+func (s *Store) DeleteJobStepLog(ctx context.Context, log *common.JobStepLog) error {
+	query := s.session.Query(DeleteJobStepLogQueryTemplate, log.Service, log.Task, log.Domain, log.ID,
+		log.StepID).WithContext(ctx)
+	return query.Exec()
 }
 func (s *Store) CreateJob(ctx context.Context, job *common.Job) error {
 	job.ID = gocql.TimeUUID().String()
