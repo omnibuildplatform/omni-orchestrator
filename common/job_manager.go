@@ -7,6 +7,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
 	"go.uber.org/zap"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"sync"
 	"time"
 )
@@ -121,7 +122,15 @@ func (m *jobManagerImpl) AcceptableJob(ctx context.Context, job Job) JobKind {
 	m.logger.Info(fmt.Sprintf("configured engine doesn't support job task %s", job.Task))
 	return JobUnrecognized
 }
-func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID string) error {
+func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error {
+	err := m.engine.DeleteJob(ctx, jobID)
+	if err != nil {
+		return errors.New(fmt.Sprintf("unable to delete job %s/%s from engine %s", jobID.Domain, jobID.ID, err))
+	}
+	err = m.store.DeleteJob(ctx, jobID)
+	if err != nil {
+		return errors.New(fmt.Sprintf("unable to delete job %s/%s from store %s", jobID.Domain, jobID.ID, err))
+	}
 	return nil
 }
 func (m *jobManagerImpl) GetJob(ctx context.Context, jobID JobIdentity) (Job, error) {
@@ -195,7 +204,12 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 			m.logger.Info(fmt.Sprintf("worker %d received job %s/%s change event", index, job.Domain, job.ID))
 			jobRes, err := m.engine.GetJob(context.TODO(), job)
 			if err != nil {
-				m.logger.Warn(fmt.Sprintf("failed to get job %s/%s information %s", job.Domain, job.ID, err))
+				if k8serrors.IsNotFound(err) {
+					m.logger.Info(fmt.Sprintf("failed to get job %s/%s information, it maybe deleted",
+						job.Domain, job.ID))
+				} else {
+					m.logger.Warn(fmt.Sprintf("failed to get job %s/%s information %s", job.Domain, job.ID, err))
+				}
 			} else {
 				err := m.store.UpdateJob(context.TODO(), jobRes)
 				if err != nil {

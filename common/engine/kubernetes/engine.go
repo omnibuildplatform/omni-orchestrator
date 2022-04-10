@@ -419,13 +419,57 @@ func (e *Engine) GetJob(ctx context.Context, jobID common.JobIdentity) (*common.
 	return nil, err
 }
 
+func (e *Engine) DeleteJob(ctx context.Context, jobID common.JobIdentity) error {
+	err := e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(jobID.Domain)).Delete(ctx, jobID.ID, metav1.DeleteOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			e.logger.Warn(fmt.Sprintf("unable to delete job %s/%s in kubernetes, it may be deleted before",
+				e.ConvertToNamespace(jobID.Domain), jobID.ID))
+			return nil
+		}
+		return err
+	}
+	e.DeleteJobRelatedResource(e.ConvertToNamespace(jobID.Domain), jobID.ID)
+	return nil
+}
+
 func (e *Engine) DeleteJobRelatedResource(namespace, name string) {
 	//delete configmap
 	err := e.clientSet.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
-		e.logger.Warn(fmt.Sprintf("Unable to delete job %s/%s related configmap %s", namespace, name, err))
+		if errors.IsNotFound(err) {
+			e.logger.Info(fmt.Sprintf("unable to delete job configmap %s/%s in kubernetes, it may be deleted before",
+				namespace, name))
+		} else {
+			e.logger.Warn(fmt.Sprintf("unable to delete job configmap %s/%s in kubernetes, error: %s",
+				namespace, name, err))
+		}
 	} else {
 		e.logger.Info(fmt.Sprintf("Job %s/%s related configmap has been deleted", namespace, name))
+	}
+	//delete pod
+	pods, err := e.clientSet.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", name),
+	})
+	if len(pods.Items) != 0 {
+		graceful := int64(10)
+		delOption := metav1.DeleteOptions{
+			GracePeriodSeconds: &graceful,
+		}
+		for _, pd := range pods.Items {
+			err := e.clientSet.CoreV1().Pods(pd.Namespace).Delete(context.TODO(), pd.Name, delOption)
+			if err == nil {
+				e.logger.Info(fmt.Sprintf("job pod %s/%s has been deleted", namespace, name))
+			} else {
+				if errors.IsNotFound(err) {
+					e.logger.Info(fmt.Sprintf("unable to delete job pod %s/%s in kubernetes, it may be deleted before",
+						namespace, name))
+				} else {
+					e.logger.Warn(fmt.Sprintf("unable to delete job pod %s/%s in kubernetes, error: %s",
+						namespace, name, err))
+				}
+			}
+		}
 	}
 }
 

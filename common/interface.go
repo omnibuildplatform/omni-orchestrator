@@ -111,7 +111,7 @@ type (
 		GetName() string
 		CreateJob(ctx context.Context, j *Job, kind JobKind) error
 		AcceptableJob(ctx context.Context, j Job) JobKind
-		DeleteJob(ctx context.Context, jobID string) error
+		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
 		StartLoop() error
 		RegisterJobChangeNotifyChannel(ch chan<- Job)
@@ -121,6 +121,7 @@ type (
 		Closeable
 		GetName() string
 		StartLoop() error
+		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		GetJobChangeChannel() chan<- Job
 		GetJobStepLogs(ctx context.Context, jobID JobIdentity, stepID string, startTime string, maxRecord int) (*JobLogPart, error)
 	}
@@ -132,6 +133,7 @@ type (
 		GetSupportedJobs() []JobKind
 		BuildOSImage(ctx context.Context, job *Job, spec JobImageBuildPara) error
 		GetJob(ctx context.Context, jobID JobIdentity) (*Job, error)
+		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		StartLoop() error
 		GetJobEventChannel() <-chan JobIdentity
 		FetchJobStepLog(ctx context.Context, domain, jobID, stepName string) (io.ReadCloser, error)
@@ -144,6 +146,8 @@ type (
 		CreateJob(ctx context.Context, job *Job) error
 		UpdateJob(ctx context.Context, job *Job) error
 		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
+		DeleteJob(ctx context.Context, jobID JobIdentity) error
+		DeleteJobLog(ctx context.Context, jobID JobIdentity) error
 		InsertJobStepLog(ctx context.Context, log *JobStepLog, ttl int64) error
 		GetJobStepLogs(ctx context.Context, jobID JobIdentity, stepID, startTime string, maxRecord int) (*JobLogPart, error)
 		DeleteJobStepLog(ctx context.Context, log *JobStepLog) error

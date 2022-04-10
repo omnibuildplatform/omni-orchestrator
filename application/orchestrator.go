@@ -126,8 +126,8 @@ func NewOrchestrator(config appconfig.Config, group *gin.RouterGroup, logger *za
 func (r *Orchestrator) Initialize() error {
 	r.routerGroup.POST("/", r.createJob)
 	r.routerGroup.GET("/", r.queryJob)
-	r.routerGroup.DELETE("/", r.deleteJob)
 	r.routerGroup.GET("/logs", r.logs)
+	r.routerGroup.DELETE("/", r.deleteJob)
 	return nil
 
 }
@@ -209,14 +209,34 @@ func (r *Orchestrator) queryJob(c *gin.Context) {
 	c.JSON(http.StatusOK, job)
 }
 
-func (r *Orchestrator) getJob(c *gin.Context) {
-	jobID := c.Param("jobID")
-	_ = jobID
-}
-
 func (r *Orchestrator) deleteJob(c *gin.Context) {
-	jobID := c.Param("jobID")
-	_ = jobID
+	var jobQuery QueryJobRequest
+	var err error
+	if err = c.ShouldBindQuery(&jobQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err = r.paraValidator.Struct(jobQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	_, err = r.jobManager.GetJob(context.TODO(), jobQuery.GetJobIdentity())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	err = r.jobManager.DeleteJob(context.TODO(), jobQuery.GetJobIdentity())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	err = r.logManager.DeleteJob(context.TODO(), jobQuery.GetJobIdentity())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, "")
+
 }
 
 // @BasePath /v1/

@@ -28,6 +28,19 @@ const (
 		`and job_id = ? ` +
 		`and step_id = ?`
 
+	DeleteJobLogQueryTemplate = `DELETE FROM log_info ` +
+		`WHERE service = ? ` +
+		`and task = ? ` +
+		`and domain = ? ` +
+		`and job_id = ? `
+
+	DeleteJobQueryTemplate = `DELETE FROM job_info ` +
+		`WHERE service = ? ` +
+		`and task = ? ` +
+		`and domain = ? ` +
+		`and job_date = ? ` +
+		`and job_id = ?`
+
 	UpdateJobQueryTemplate = `UPDATE job_info ` +
 		`SET started_time = ?, ` +
 		`finished_time = ?, ` +
@@ -149,6 +162,14 @@ func (s *Store) InsertJobStepLog(ctx context.Context, log *common.JobStepLog, tt
 	return nil
 }
 
+func (s *Store) getJobDateStringFromID(jobID string) (string, error) {
+	jobTime, err := gocql.ParseUUID(jobID)
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("unable to parse job id %s", err.Error()))
+	}
+	return jobTime.Time().Format("2006-01-02"), nil
+}
+
 func (s *Store) DeleteJobStepLog(ctx context.Context, log *common.JobStepLog) error {
 	query := s.session.Query(DeleteJobStepLogQueryTemplate, log.Service, log.Task, log.Domain, log.ID,
 		log.StepID).WithContext(ctx)
@@ -186,12 +207,25 @@ func (s *Store) CreateJob(ctx context.Context, job *common.Job) error {
 	return nil
 }
 
-func (s *Store) GetJob(ctx context.Context, jobID common.JobIdentity) (common.Job, error) {
-	jobTime, err := gocql.ParseUUID(jobID.ID)
+func (s *Store) DeleteJob(ctx context.Context, jobID common.JobIdentity) error {
+	jobDate, err := s.getJobDateStringFromID(jobID.ID)
 	if err != nil {
-		return common.Job{}, errors.New(fmt.Sprintf("unable to parse job id %s", err.Error()))
+		return err
 	}
-	jobDate := jobTime.Time().Format("2006-01-02")
+	query := s.session.Query(DeleteJobQueryTemplate, jobID.Service, jobID.Task, jobID.Domain, jobDate, jobID.ID).WithContext(ctx)
+	return query.Exec()
+}
+
+func (s *Store) DeleteJobLog(ctx context.Context, jobID common.JobIdentity) error {
+	query := s.session.Query(DeleteJobLogQueryTemplate, jobID.Service, jobID.Task, jobID.Domain, jobID.ID).WithContext(ctx)
+	return query.Exec()
+}
+
+func (s *Store) GetJob(ctx context.Context, jobID common.JobIdentity) (common.Job, error) {
+	jobDate, err := s.getJobDateStringFromID(jobID.ID)
+	if err != nil {
+		return common.Job{}, err
+	}
 	query := s.session.Query(GetJobQueryTemplate, jobID.Service, jobID.Task, jobID.Domain, jobDate, jobID.ID).WithContext(context.TODO())
 	result := make(map[string]interface{})
 	if err := query.MapScan(result); err != nil {
