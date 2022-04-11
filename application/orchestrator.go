@@ -244,11 +244,12 @@ func (r *Orchestrator) deleteJob(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	err = r.logManager.DeleteJob(context.TODO(), jobQuery.GetJobIdentity())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	//Delete job log are not performed, it will be deleted when TTL expire
+	//err = r.logManager.DeleteJob(context.TODO(), jobQuery.GetJobIdentity())
+	//if err != nil {
+	//	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
 	c.JSON(http.StatusOK, "")
 
 }

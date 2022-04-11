@@ -76,6 +76,11 @@ func NewLogManagerImpl(engine JobEngine, store JobStore, config appconfig.LogMan
 }
 
 func (l *logManagerImpl) Close() {
+	l.JobLogContext.Range(func(key, value interface{}) bool {
+		cancelFunc := value.(JobStepContext).cancel
+		cancelFunc()
+		return true
+	})
 	l.closed = true
 	close(l.closeCh)
 	close(l.jobChangeCh)
@@ -99,11 +104,6 @@ func (l *logManagerImpl) StartLoop() error {
 }
 
 func (l *logManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error {
-	wrapper, ok := l.JobLogContext.Load(jobID.ID)
-	if ok {
-		cancelFunc := wrapper.(JobStepContext).cancel
-		cancelFunc()
-	}
 	return l.store.DeleteJobLog(ctx, jobID)
 }
 
