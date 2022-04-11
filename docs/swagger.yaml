@@ -104,6 +104,39 @@ paths:
       tags:
       - Status
   /jobs:
+    delete:
+      consumes:
+      - application/json
+      description: Delete Job with identity
+      parameters:
+      - description: job service type
+        in: query
+        name: service
+        required: true
+        type: string
+      - description: job task type
+        in: query
+        name: task
+        required: true
+        type: string
+      - description: job domain type
+        in: query
+        name: domain
+        required: true
+        type: string
+      - description: job ID
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+      summary: Delete a job
+      tags:
+      - Job
     get:
       consumes:
       - application/json

@@ -209,6 +209,20 @@ func (r *Orchestrator) queryJob(c *gin.Context) {
 	c.JSON(http.StatusOK, job)
 }
 
+// @BasePath /v1/
+
+// DeleteJob godoc
+// @Summary Delete a job
+// @Param service query  string	true	"job service type"
+// @Param task	query  string	true	"job task type"
+// @Param domain query  string	true	"job domain type"
+// @Param id query  string	true	"job ID"
+// @Description Delete Job with identity
+// @Tags Job
+// @Accept json
+// @Produce json
+// @Success 200
+// @Router /jobs [delete]
 func (r *Orchestrator) deleteJob(c *gin.Context) {
 	var jobQuery QueryJobRequest
 	var err error
