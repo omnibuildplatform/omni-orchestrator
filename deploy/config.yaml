@@ -19,7 +19,7 @@ data:
     [engine]
     pluginName = "kubernetes"
     configFile = ""
-    imageTagForOSImageBuild = "tommylike/omni-worker:0.2.1"
+    imageTagForOSImageBuild = "tommylike/omni-worker:0.2.3"
     OmniRepoAddress = "http://omni-repository.omni-repository.svc.cluster.local"
     OmniRepoToken = "316462d0c029ba707ad2"
     [persistentStore]
