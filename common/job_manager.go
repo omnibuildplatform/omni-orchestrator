@@ -158,9 +158,11 @@ func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error
 	job.EndTime = stopTime
 	job.Detail = "job stopped"
 	for index, _ := range job.Steps {
-		job.Steps[index].State = StepStopped
-		job.Steps[index].EndTime = stopTime
-		job.Steps[index].Message = "step stopped"
+		if job.Steps[index].State == StepCreated || job.Steps[index].State == StepRunning {
+			job.Steps[index].State = StepStopped
+			job.Steps[index].EndTime = stopTime
+			job.Steps[index].Message = "step stopped"
+		}
 	}
 	job.Version += 1
 	err = m.store.UpdateJobStatus(ctx, &job, job.Version-1)

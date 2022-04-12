@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 const (
@@ -328,4 +329,5 @@ func (r *Orchestrator) Close() {
 		r.logManager.Close()
 	}
 	r.logger.Info("log manager closed.")
+	time.Sleep(3 * time.Second)
 }
