@@ -37,8 +37,6 @@ definitions:
         type: string
       domain:
         type: string
-      duration:
-        type: integer
       endTime:
         type: string
       engine:

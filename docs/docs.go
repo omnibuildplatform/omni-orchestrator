@@ -298,9 +298,6 @@ const docTemplate = `{
                 "domain": {
                     "type": "string"
                 },
-                "duration": {
-                    "type": "integer"
-                },
                 "endTime": {
                     "type": "string"
                 },

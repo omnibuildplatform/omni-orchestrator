@@ -65,7 +65,6 @@ type (
 		StartTime time.Time              `json:"startTime"`
 		EndTime   time.Time              `json:"endTime"`
 		State     JobState               `json:"state"`
-		Duration  int                    `json:"duration"`
 		Steps     []Step                 `json:"steps"`
 		Detail    string                 `json:"detail"`
 		Version   int32                  `json:"version"`
