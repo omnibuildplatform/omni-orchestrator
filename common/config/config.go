@@ -25,6 +25,8 @@ type (
 		Name         string `mapstructure:"name"`
 		Worker       int    `mapstructure:"worker"`
 		SyncInterval int    `mapstructure:"syncInterval"`
+		//TTL for job record in the format of second
+		TTL int64 `mapstructure:"ttl"`
 	}
 
 	LogManager struct {

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS omni_orchestrator.job_info(
   state                     text,
   steps                     frozen<list<step_info>>,
   detail                    text,
+  version                   int,
   PRIMARY KEY  ((service, task), domain, job_date, job_id)
 );
 

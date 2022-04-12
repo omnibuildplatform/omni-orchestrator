@@ -334,6 +334,9 @@ const docTemplate = `{
                 },
                 "userID": {
                     "type": "string"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },

@@ -15,8 +15,8 @@ import (
 const (
 	MaxJobStepLogRecord    = 20
 	InsertJobQueryTemplate = `INSERT INTO job_info (` +
-		`service, task, domain, job_date, job_id, user_id, engine, spec, started_time, finished_time, state, steps, detail) ` +
-		`VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS`
+		`service, task, domain, job_date, job_id, user_id, engine, spec, started_time, finished_time, state, steps, detail, version) ` +
+		`VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS USING TTL ?`
 	InsertJobStepLogQueryTemplate = `INSERT INTO log_info (` +
 		`service, task, domain, job_id, step_id, log_time, data) ` +
 		`VALUES(?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS USING TTL ?`
@@ -46,14 +46,15 @@ const (
 		`finished_time = ?, ` +
 		`state = ?, ` +
 		`steps = ?, ` +
-		`detail = ? ` +
+		`detail = ?, ` +
+		`version = ?` +
 		`WHERE service = ? ` +
 		`and task = ? ` +
 		`and domain = ? ` +
 		`and job_date = ? ` +
 		`and job_id = ?` +
-		`IF EXISTS`
-	GetJobQueryTemplate = `SELECT service, task, domain, job_id, user_id, engine, spec, started_time, finished_time, state, steps, detail ` +
+		`IF version = ?`
+	GetJobQueryTemplate = `SELECT service, task, domain, job_id, user_id, engine, spec, started_time, finished_time, state, steps, detail, version ` +
 		`FROM job_info ` +
 		`WHERE service = ? ` +
 		`and task = ? ` +
@@ -114,7 +115,7 @@ func (s *Store) Initialize() error {
 	return nil
 }
 
-func (s *Store) UpdateJob(ctx context.Context, job *common.Job) error {
+func (s *Store) UpdateJobStatus(ctx context.Context, job *common.Job, version int32) error {
 	if job.ID == "" || job.Domain == "" || job.Service == "" || job.Task == "" {
 		return errors.New("job id, domain, service, task is empty")
 	}
@@ -137,7 +138,7 @@ func (s *Store) UpdateJob(ctx context.Context, job *common.Job) error {
 		}
 	}
 	query := s.session.Query(UpdateJobQueryTemplate, job.StartTime.UnixMilli(), job.EndTime.UnixMilli(),
-		job.State, steps, job.Detail, job.Service, job.Task, job.Domain, jobDate, job.ID).WithContext(ctx)
+		job.State, steps, job.Detail, job.Version, job.Service, job.Task, job.Domain, jobDate, job.ID, version).WithContext(ctx)
 	applied, err := query.MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		return err
@@ -175,13 +176,15 @@ func (s *Store) DeleteJobStepLog(ctx context.Context, log *common.JobStepLog) er
 		log.StepID).WithContext(ctx)
 	return query.Exec()
 }
-func (s *Store) CreateJob(ctx context.Context, job *common.Job) error {
+func (s *Store) CreateJob(ctx context.Context, job *common.Job, ttl int64) error {
 	job.ID = gocql.TimeUUID().String()
 	jobDate := time.Now().Format("2006-01-02")
 	jobSpec, err := json.Marshal(job.Spec)
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to encode job spec %s", err))
 	}
+	//always zero when insert
+	job.Version = 0
 	var steps []map[string]interface{}
 	if job != nil {
 		for _, step := range job.Steps {
@@ -196,7 +199,7 @@ func (s *Store) CreateJob(ctx context.Context, job *common.Job) error {
 		}
 	}
 	query := s.session.Query(InsertJobQueryTemplate, job.Service, job.Task, job.Domain, jobDate, job.ID, job.UserID, job.Engine,
-		jobSpec, job.StartTime.UnixMilli(), job.EndTime.UnixMilli(), job.State, steps, job.Detail).WithContext(ctx)
+		jobSpec, job.StartTime.UnixMilli(), job.EndTime.UnixMilli(), job.State, steps, job.Detail, job.Version, ttl).WithContext(ctx)
 	applied, err := query.MapScanCAS(make(map[string]interface{}))
 	if err != nil {
 		return err
@@ -263,6 +266,11 @@ func (s *Store) GetJob(ctx context.Context, jobID common.JobIdentity) (common.Jo
 		job.Detail = value
 	} else {
 		s.logger.Warn("unable to decode job detail")
+	}
+	if value, ok := (result["version"]).(int); ok {
+		job.Version = int32(value)
+	} else {
+		s.logger.Warn("unable to decode job version")
 	}
 	//append steps
 	stepsDB, ok := result["steps"].([]map[string]interface{})

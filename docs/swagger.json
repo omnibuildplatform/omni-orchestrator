@@ -322,6 +322,9 @@
                 },
                 "userID": {
                     "type": "string"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },

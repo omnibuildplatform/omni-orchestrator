@@ -7,8 +7,11 @@ errFile = "./logs/error-{date}.log"
 [jobManager]
 worker = 3
 syncInterval = 2
+# job will save only 6 month
+ttl = 15552000
 [logManager]
 worker = 5
+# log will save only 1 month
 ttl = 2592000
 [engine]
 pluginName = "kubernetes"

@@ -66,6 +66,7 @@ type (
 		Duration  int                    `json:"duration"`
 		Steps     []Step                 `json:"steps"`
 		Detail    string                 `json:"detail"`
+		Version   int32                  `json:"version"`
 	}
 
 	Step struct {
@@ -132,7 +133,7 @@ type (
 		GetName() string
 		GetSupportedJobs() []JobKind
 		BuildOSImage(ctx context.Context, job *Job, spec JobImageBuildPara) error
-		GetJob(ctx context.Context, jobID JobIdentity) (*Job, error)
+		GetJobStatus(ctx context.Context, jobID JobIdentity) (*Job, error)
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		StartLoop() error
 		GetJobEventChannel() <-chan JobIdentity
@@ -143,8 +144,8 @@ type (
 		Closeable
 		Initialize() error
 		GetName() string
-		CreateJob(ctx context.Context, job *Job) error
-		UpdateJob(ctx context.Context, job *Job) error
+		CreateJob(ctx context.Context, job *Job, ttl int64) error
+		UpdateJobStatus(ctx context.Context, job *Job, version int32) error
 		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		DeleteJobLog(ctx context.Context, jobID JobIdentity) error

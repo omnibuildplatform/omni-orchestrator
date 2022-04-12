@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DefaultJobTTL       = 60 * 60 * 24 * 7
+	DefaultJobLogTTL    = 60 * 60 * 24 * 7
 	JobStepID           = "%s/%s"
 	JobLogReadSize      = 8 * 1024
 	JobChannelSize      = 100
@@ -58,7 +58,7 @@ type logManagerImpl struct {
 func NewLogManagerImpl(engine JobEngine, store JobStore, config appconfig.LogManager, logger *zap.Logger) (LogManager, error) {
 	var jobTTL int64
 	if config.TTL == 0 {
-		jobTTL = DefaultJobTTL
+		jobTTL = DefaultJobLogTTL
 	} else {
 		jobTTL = config.TTL
 	}

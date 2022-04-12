@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+const (
+	DefaultJobTTL = 60 * 60 * 24 * 7
+)
+
 type jobChangeListener struct {
 	sync.Mutex
 	channels []chan<- Job
@@ -39,9 +43,16 @@ type jobManagerImpl struct {
 	closeCh           chan struct{}
 	closed            bool
 	jobChangeListener *jobChangeListener
+	jobTTL            int64
 }
 
 func NewJobManagerImpl(engine JobEngine, store JobStore, config appconfig.JobManager, logger *zap.Logger) (JobManager, error) {
+	var jobTTL int64
+	if config.TTL == 0 {
+		jobTTL = DefaultJobTTL
+	} else {
+		jobTTL = config.TTL
+	}
 	return &jobManagerImpl{
 		engine:  engine,
 		logger:  logger,
@@ -52,6 +63,7 @@ func NewJobManagerImpl(engine JobEngine, store JobStore, config appconfig.JobMan
 		jobChangeListener: &jobChangeListener{
 			channels: []chan<- Job{},
 		},
+		jobTTL: jobTTL,
 	}, nil
 }
 
@@ -61,7 +73,7 @@ func (m *jobManagerImpl) GetName() string {
 
 func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind JobKind) error {
 	var err error
-	err = m.store.CreateJob(ctx, job)
+	err = m.store.CreateJob(ctx, job, m.jobTTL)
 	if err != nil {
 		m.logger.Error(fmt.Sprintf("unable to save job info %s", err))
 		return err
@@ -71,17 +83,23 @@ func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind JobKind) 
 		err = m.createBuildISOJob(ctx, job)
 		break
 	}
+	oldJob, err := m.store.GetJob(ctx, job.JobIdentity)
 	if err != nil {
-		job.State = JobFailed
-		job.Detail = err.Error()
-		updateErr := m.store.UpdateJob(ctx, job)
+		m.logger.Error(fmt.Sprintf("unable to get job info for update %s", err))
+		return err
+	}
+	oldJob.Version += 1
+	if err != nil {
+		oldJob.State = JobFailed
+		oldJob.Detail = err.Error()
+		updateErr := m.store.UpdateJobStatus(ctx, &oldJob, oldJob.Version-1)
 		if updateErr != nil {
 			m.logger.Error(fmt.Sprintf("failed to update job info into database %s", updateErr))
 		}
 		return err
 	} else {
-		job.State = JobCreated
-		updateErr := m.store.UpdateJob(ctx, job)
+		oldJob.State = JobCreated
+		updateErr := m.store.UpdateJobStatus(ctx, &oldJob, oldJob.Version-1)
 		if updateErr != nil {
 			m.logger.Error(fmt.Sprintf("failed to update job info into database %s", updateErr))
 			return updateErr
@@ -202,7 +220,7 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 				return
 			}
 			m.logger.Info(fmt.Sprintf("worker %d received job %s/%s change event", index, job.Domain, job.ID))
-			jobRes, err := m.engine.GetJob(context.TODO(), job)
+			jobRes, err := m.engine.GetJobStatus(context.TODO(), job)
 			if err != nil {
 				if k8serrors.IsNotFound(err) {
 					m.logger.Info(fmt.Sprintf("failed to get job %s/%s information, it maybe deleted",
@@ -211,11 +229,23 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 					m.logger.Warn(fmt.Sprintf("failed to get job %s/%s information %s", job.Domain, job.ID, err))
 				}
 			} else {
-				err := m.store.UpdateJob(context.TODO(), jobRes)
+				oldJob, err := m.store.GetJob(context.TODO(), jobRes.JobIdentity)
+				oldJob.Version += 1
 				if err != nil {
-					m.logger.Error(fmt.Sprintf("failed to update job status to store due to: %s", err))
+					m.logger.Error(fmt.Sprintf("unable to get job info for update %s", err))
+				} else {
+					oldJob.StartTime = jobRes.StartTime
+					oldJob.EndTime = jobRes.EndTime
+					oldJob.Steps = jobRes.Steps
+					oldJob.State = jobRes.State
+					oldJob.Detail = jobRes.Detail
+					err := m.store.UpdateJobStatus(context.TODO(), &oldJob, oldJob.Version-1)
+					if err != nil {
+						m.logger.Error(fmt.Sprintf("failed to update job status to store due to: %s", err))
+					}
+					m.jobChangeListener.Notify(*jobRes)
+
 				}
-				m.jobChangeListener.Notify(*jobRes)
 			}
 		}
 	}

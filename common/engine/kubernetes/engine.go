@@ -377,7 +377,7 @@ func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[s
 	return service, task, domain
 }
 
-func (e *Engine) GetJob(ctx context.Context, jobID common.JobIdentity) (*common.Job, error) {
+func (e *Engine) GetJobStatus(ctx context.Context, jobID common.JobIdentity) (*common.Job, error) {
 	jobResource := common.Job{
 		JobIdentity: jobID,
 	}
