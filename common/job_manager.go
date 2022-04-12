@@ -150,6 +150,9 @@ func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error
 	if err != nil {
 		return err
 	}
+	if job.State == JobStopped || job.State == JobSucceed || job.State == JobFailed {
+		return errors.New(fmt.Sprintf("unable to delete job %s/%s, it's already finished", jobID.Domain, jobID.ID))
+	}
 	job.State = JobStopped
 	stopTime := time.Now()
 	job.EndTime = stopTime

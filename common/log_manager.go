@@ -33,11 +33,6 @@ type JobStepInfo struct {
 	StepName string
 }
 
-type JobStepInfoWithContext struct {
-	JobStepInfo
-	Context context.Context
-}
-
 type logManagerImpl struct {
 	engine      JobEngine
 	logger      *zap.Logger
@@ -46,12 +41,11 @@ type logManagerImpl struct {
 	closeCh     chan struct{}
 	closed      bool
 	jobChangeCh chan Job
-	stepLogCh   chan JobStepInfoWithContext
+	stepLogCh   chan JobStepInfo
 	//Job logs are split into steps
 	jobStepLogMap sync.Map
 	//Job log context
-	JobLogContext sync.Map
-	ctxLock       sync.Mutex
+	JobLogContext *JobStepContext
 	jobTTL        int64
 }
 
@@ -62,25 +56,29 @@ func NewLogManagerImpl(engine JobEngine, store JobStore, config appconfig.LogMan
 	} else {
 		jobTTL = config.TTL
 	}
+	ctx, cancel := context.WithCancel(context.TODO())
+	jobLogContext := JobStepContext{
+		cancel: cancel,
+		ctx:    ctx,
+	}
 	return &logManagerImpl{
-		engine:      engine,
-		logger:      logger,
-		config:      config,
-		store:       store,
-		closeCh:     make(chan struct{}, 1),
-		closed:      false,
-		jobChangeCh: make(chan Job, JobChannelSize),
-		stepLogCh:   make(chan JobStepInfoWithContext, JobChannelSize),
-		jobTTL:      jobTTL,
+		engine:        engine,
+		logger:        logger,
+		config:        config,
+		store:         store,
+		closeCh:       make(chan struct{}, 1),
+		closed:        false,
+		jobChangeCh:   make(chan Job, JobChannelSize),
+		stepLogCh:     make(chan JobStepInfo, JobChannelSize),
+		jobTTL:        jobTTL,
+		JobLogContext: &jobLogContext,
 	}, nil
 }
 
 func (l *logManagerImpl) Close() {
-	l.JobLogContext.Range(func(key, value interface{}) bool {
-		cancelFunc := value.(JobStepContext).cancel
-		cancelFunc()
-		return true
-	})
+	if l.JobLogContext != nil {
+		l.JobLogContext.cancel()
+	}
 	l.closed = true
 	close(l.closeCh)
 	close(l.jobChangeCh)
@@ -107,25 +105,6 @@ func (l *logManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error
 	return l.store.DeleteJobLog(ctx, jobID)
 }
 
-func (l *logManagerImpl) CreateOrLoadJobLogContext(jobID string) context.Context {
-	l.ctxLock.Lock()
-	defer l.ctxLock.Unlock()
-
-	var ctx context.Context
-	ctxWrapper, ok := l.JobLogContext.Load(jobID)
-	if ok {
-		ctx = ctxWrapper.(JobStepContext).ctx
-	} else {
-		newCTX, cancelFunc := context.WithCancel(context.TODO())
-		l.JobLogContext.Store(jobID, JobStepContext{
-			ctx:    newCTX,
-			cancel: cancelFunc,
-		})
-		ctx = newCTX
-	}
-	return ctx
-}
-
 func (l *logManagerImpl) FetchRunningSteps() {
 	for {
 		select {
@@ -141,16 +120,13 @@ func (l *logManagerImpl) FetchRunningSteps() {
 						identity := fmt.Sprintf(JobStepID, job.ID, step.Name)
 						if _, loaded := l.jobStepLogMap.LoadOrStore(identity, identity); !loaded {
 							//start to collect job step logs
-							l.stepLogCh <- JobStepInfoWithContext{
-								JobStepInfo: JobStepInfo{
-									Service:  job.Service,
-									Task:     job.Task,
-									Domain:   job.Domain,
-									JobID:    job.ID,
-									StepID:   strconv.Itoa(step.ID),
-									StepName: step.Name,
-								},
-								Context: l.CreateOrLoadJobLogContext(job.ID),
+							l.stepLogCh <- JobStepInfo{
+								Service:  job.Service,
+								Task:     job.Task,
+								Domain:   job.Domain,
+								JobID:    job.ID,
+								StepID:   strconv.Itoa(step.ID),
+								StepName: step.Name,
 							}
 						}
 					}
@@ -161,7 +137,7 @@ func (l *logManagerImpl) FetchRunningSteps() {
 	}
 }
 
-func (l *logManagerImpl) SyncJobSteplog(index int, ch chan JobStepInfoWithContext) {
+func (l *logManagerImpl) SyncJobSteplog(index int, ch chan JobStepInfo) {
 	for {
 		select {
 		case jobStep, ok := <-ch:
@@ -169,7 +145,7 @@ func (l *logManagerImpl) SyncJobSteplog(index int, ch chan JobStepInfoWithContex
 				l.logger.Info(fmt.Sprintf("channel closed: log sync worker %d will quit", index))
 				return
 			} else {
-				logReader, err := l.engine.FetchJobStepLog(jobStep.Context, jobStep.Domain, jobStep.JobID, jobStep.StepName)
+				logReader, err := l.engine.FetchJobStepLog(l.JobLogContext.ctx, jobStep.Domain, jobStep.JobID, jobStep.StepName)
 				if err != nil {
 					l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobID, err))
 				} else {
@@ -184,8 +160,8 @@ func (l *logManagerImpl) SyncJobSteplog(index int, ch chan JobStepInfoWithContex
 						},
 						StepID: jobStep.StepID,
 					}
-					err = l.store.DeleteJobStepLog(jobStep.Context, &stepLog)
-					err = l.ReadJobStepLog(jobStep.Context, jobStep, logReader)
+					err = l.store.DeleteJobStepLog(l.JobLogContext.ctx, &stepLog)
+					err = l.ReadJobStepLog(l.JobLogContext.ctx, jobStep, logReader)
 					if err != nil {
 						l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobID, err))
 					}
@@ -200,7 +176,7 @@ func (l *logManagerImpl) GetJobStepLogs(ctx context.Context, jobID JobIdentity, 
 	return l.store.GetJobStepLogs(ctx, jobID, stepID, startTime, maxRecord)
 }
 
-func (l *logManagerImpl) InsertLogPart(context context.Context, jobStep JobStepInfoWithContext, data []byte, logTime time.Time) {
+func (l *logManagerImpl) InsertLogPart(context context.Context, jobStep JobStepInfo, data []byte, logTime time.Time) {
 	log := JobStepLog{
 		JobIdentity: JobIdentity{
 			Service: jobStep.Service,
@@ -221,7 +197,7 @@ func (l *logManagerImpl) InsertLogPart(context context.Context, jobStep JobStepI
 
 }
 
-func (l *logManagerImpl) ReadJobStepLog(context context.Context, jobStep JobStepInfoWithContext, reader io.ReadCloser) error {
+func (l *logManagerImpl) ReadJobStepLog(context context.Context, jobStep JobStepInfo, reader io.ReadCloser) error {
 	defer reader.Close()
 	var logs []byte
 	ticker := time.NewTicker(JobLogStoreInterval * time.Second)
