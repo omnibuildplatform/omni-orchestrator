@@ -15,6 +15,7 @@ const (
 	JobRunning JobState = "JobRunning"
 	JobSucceed JobState = "JobSucceed"
 	JobFailed  JobState = "JobFailed"
+	JobStopped JobState = "JobStopped"
 )
 
 const (
@@ -28,6 +29,7 @@ const (
 	StepRunning StepState = "StepRunning"
 	StepSucceed StepState = "StepSucceed"
 	StepFailed  StepState = "StepFailed"
+	StepStopped StepState = "StepStopped"
 )
 
 type JobKind string

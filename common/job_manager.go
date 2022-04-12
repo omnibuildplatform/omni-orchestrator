@@ -145,7 +145,22 @@ func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to delete job %s/%s from engine %s", jobID.Domain, jobID.ID, err))
 	}
-	err = m.store.DeleteJob(ctx, jobID)
+	//when delete we mark all job and step state stopped
+	job, err := m.store.GetJob(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	job.State = JobStopped
+	stopTime := time.Now()
+	job.EndTime = stopTime
+	job.Detail = "job stopped"
+	for index, _ := range job.Steps {
+		job.Steps[index].State = StepStopped
+		job.Steps[index].EndTime = stopTime
+		job.Steps[index].Message = "step stopped"
+	}
+	job.Version += 1
+	err = m.store.UpdateJobStatus(ctx, &job, job.Version-1)
 	if err != nil {
 		return errors.New(fmt.Sprintf("unable to delete job %s/%s from store %s", jobID.Domain, jobID.ID, err))
 	}
