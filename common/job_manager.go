@@ -76,11 +76,16 @@ func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind JobKind) 
 	err = m.store.CreateJob(ctx, job, m.jobTTL)
 	if err != nil {
 		m.logger.Error(fmt.Sprintf("unable to save job info %s", err))
+		m.store.DeleteJob(ctx, job.JobIdentity)
 		return err
 	}
 	switch kind {
 	case JobImageBuild:
 		err = m.createBuildISOJob(ctx, job)
+		if err != nil {
+			m.logger.Error(fmt.Sprintf("unable to create job in engine: %s", err))
+			return err
+		}
 		break
 	}
 	oldJob, err := m.store.GetJob(ctx, job.JobIdentity)
