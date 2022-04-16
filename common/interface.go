@@ -51,10 +51,11 @@ type (
 	}
 
 	JobIdentity struct {
-		Service string `json:"service"`
-		Task    string `json:"task" `
-		Domain  string `json:"domain"`
-		ID      string `json:"id"`
+		Service         string            `json:"service"`
+		Task            string            `json:"task"`
+		Domain          string            `json:"domain"`
+		ID              string            `json:"id"`
+		ExtraIdentities map[string]string `json:"extraIdentities,omitempty"`
 	}
 
 	Job struct {
@@ -138,7 +139,7 @@ type (
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		StartLoop() error
 		GetJobEventChannel() <-chan JobIdentity
-		FetchJobStepLog(ctx context.Context, domain, jobID, stepName string) (io.ReadCloser, error)
+		FetchJobStepLog(ctx context.Context, jobID JobIdentity, stepName string) (io.ReadCloser, error)
 	}
 
 	JobStore interface {

@@ -39,7 +39,8 @@ type (
 	Engine struct {
 		PluginName string `mapstructure:"pluginName"`
 		//Section below belongs to config option related to kubernetes engine
-		ConfigFile              string `mapstructure:"configFile"`
+		X86ConfigFile           string `mapstructure:"x86ConfigFile"`
+		Aarch64ConfigFile       string `mapstructure:"aarch64ConfigFile"`
 		ImageTagForOSImageBuild string `mapstructure:"imageTagForOSImageBuild"`
 		OmniRepoAddress         string `mapstructure:"omniRepoAddress"`
 		OmniRepoToken           string `mapstructure:"omniRepoToken"`

@@ -25,12 +25,13 @@ type JobStepContext struct {
 }
 
 type JobStepInfo struct {
-	Service  string
-	Task     string
-	Domain   string
-	JobID    string
-	StepID   string
-	StepName string
+	Service         string
+	Task            string
+	Domain          string
+	JobID           string
+	ExtraIdentities map[string]string
+	StepID          string
+	StepName        string
 }
 
 type logManagerImpl struct {
@@ -121,12 +122,13 @@ func (l *logManagerImpl) FetchRunningSteps() {
 						if _, loaded := l.jobStepLogMap.LoadOrStore(identity, identity); !loaded {
 							//start to collect job step logs
 							l.stepLogCh <- JobStepInfo{
-								Service:  job.Service,
-								Task:     job.Task,
-								Domain:   job.Domain,
-								JobID:    job.ID,
-								StepID:   strconv.Itoa(step.ID),
-								StepName: step.Name,
+								Service:         job.Service,
+								Task:            job.Task,
+								Domain:          job.Domain,
+								JobID:           job.ID,
+								ExtraIdentities: job.ExtraIdentities,
+								StepID:          strconv.Itoa(step.ID),
+								StepName:        step.Name,
 							}
 						}
 					}
@@ -145,21 +147,22 @@ func (l *logManagerImpl) SyncJobSteplog(index int, ch chan JobStepInfo) {
 				l.logger.Info(fmt.Sprintf("channel closed: log sync worker %d will quit", index))
 				return
 			} else {
-				logReader, err := l.engine.FetchJobStepLog(l.JobLogContext.ctx, jobStep.Domain, jobStep.JobID, jobStep.StepName)
+				stepLog := JobStepLog{
+					JobIdentity: JobIdentity{
+						Service:         jobStep.Service,
+						Task:            jobStep.Task,
+						Domain:          jobStep.Domain,
+						ID:              jobStep.JobID,
+						ExtraIdentities: jobStep.ExtraIdentities,
+					},
+					StepID: jobStep.StepID,
+				}
+				logReader, err := l.engine.FetchJobStepLog(l.JobLogContext.ctx, stepLog.JobIdentity, jobStep.StepName)
 				if err != nil {
 					l.logger.Info(fmt.Sprintf("can't fetch job %s/%s step logs, error: %s", jobStep.Domain, jobStep.JobID, err))
 				} else {
 					//hacky code here to delete all logs regarding this job step
 					l.logger.Info(fmt.Sprintf("job step %s/%s log will be cleared.", jobStep.JobID, jobStep.StepID))
-					stepLog := JobStepLog{
-						JobIdentity: JobIdentity{
-							Service: jobStep.Service,
-							Task:    jobStep.Task,
-							Domain:  jobStep.Domain,
-							ID:      jobStep.JobID,
-						},
-						StepID: jobStep.StepID,
-					}
 					err = l.store.DeleteJobStepLog(l.JobLogContext.ctx, &stepLog)
 					err = l.ReadJobStepLog(l.JobLogContext.ctx, jobStep, logReader)
 					if err != nil {

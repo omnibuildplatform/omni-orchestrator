@@ -304,6 +304,12 @@ const docTemplate = `{
                 "engine": {
                     "type": "string"
                 },
+                "extraIdentities": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "id": {
                     "type": "string"
                 },
