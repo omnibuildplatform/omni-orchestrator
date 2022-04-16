@@ -179,6 +179,10 @@ func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error
 func (m *jobManagerImpl) GetJob(ctx context.Context, jobID JobIdentity) (Job, error) {
 	return m.store.GetJob(ctx, jobID)
 }
+
+func (m *jobManagerImpl) BatchGetJobs(ctx context.Context, jobID JobIdentity, IDs []string) ([]Job, error) {
+	return m.store.BatchGetJobs(ctx, jobID, IDs)
+}
 func (m *jobManagerImpl) Close() {
 	m.closed = true
 	close(m.closeCh)

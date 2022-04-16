@@ -172,6 +172,43 @@ const docTemplate = `{
                 }
             }
         },
+        "/jobs/batchQuery": {
+            "post": {
+                "description": "Query multiple job status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Job"
+                ],
+                "summary": "Query Job Status",
+                "parameters": [
+                    {
+                        "description": "body for query multiple jobs",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/application.QueryJobRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/common.Job"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/jobs/logs": {
             "get": {
                 "description": "Query job status with identity",
@@ -285,6 +322,29 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "userID": {
+                    "type": "string"
+                }
+            }
+        },
+        "application.QueryJobRequest": {
+            "type": "object",
+            "required": [
+                "ID",
+                "domain",
+                "service",
+                "task"
+            ],
+            "properties": {
+                "ID": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "task": {
                     "type": "string"
                 }
             }

@@ -40,6 +40,20 @@ type CreateJobRequest struct {
 	Engine  string                 `json:"engine" json:"engine" validate:"required"`
 }
 
+type QueryJobRequest struct {
+	Service string `form:"service" json:"service" validate:"required"`
+	Task    string `form:"task" json:"task" validate:"required"`
+	Domain  string `form:"domain" json:"domain" validate:"required"`
+	ID      string `form:"ID" json:"ID" validate:"required,uuid"`
+}
+
+type BatchQueryJobRequest struct {
+	Service string   `form:"service" json:"service" validate:"required"`
+	Task    string   `form:"task" json:"task" validate:"required"`
+	Domain  string   `form:"domain" json:"domain" validate:"required"`
+	IDs     []string `form:"IDs" json:"IDs" validate:"required"`
+}
+
 func (q CreateJobRequest) GetJobResource() common.Job {
 	return common.Job{
 		JobIdentity: common.JobIdentity{
@@ -53,11 +67,12 @@ func (q CreateJobRequest) GetJobResource() common.Job {
 	}
 }
 
-type QueryJobRequest struct {
-	Service string `form:"service" json:"service" validate:"required"`
-	Task    string `form:"task" json:"task" validate:"required"`
-	Domain  string `form:"domain" json:"domain" validate:"required"`
-	ID      string `form:"ID" json:"ID" validate:"required,uuid"`
+func (q BatchQueryJobRequest) GetJobIdentity() common.JobIdentity {
+	return common.JobIdentity{
+		Service: q.Service,
+		Task:    q.Task,
+		Domain:  q.Domain,
+	}
 }
 
 func (q QueryJobRequest) GetJobIdentity() common.JobIdentity {
@@ -127,6 +142,7 @@ func NewOrchestrator(config appconfig.Config, group *gin.RouterGroup, logger *za
 func (r *Orchestrator) Initialize() error {
 	r.routerGroup.POST("/", r.createJob)
 	r.routerGroup.GET("/", r.queryJob)
+	r.routerGroup.POST("/batchQuery", r.batchQueryJobs)
 	r.routerGroup.GET("/logs", r.logs)
 	r.routerGroup.DELETE("/", r.deleteJob)
 	return nil
@@ -203,6 +219,36 @@ func (r *Orchestrator) queryJob(c *gin.Context) {
 		return
 	}
 	job, err := r.jobManager.GetJob(context.TODO(), jobQuery.GetJobIdentity())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, job)
+}
+
+// @BasePath /v1/
+
+// QueryJobStatus godoc
+// @Summary Query Job Status
+// @Param body body QueryJobRequest true "body for query multiple jobs"
+// @Description Query multiple job status
+// @Tags Job
+// @Accept json
+// @Produce json
+// @Success 200 object []common.Job
+// @Router /jobs/batchQuery [post]
+func (r *Orchestrator) batchQueryJobs(c *gin.Context) {
+	var jobQuery BatchQueryJobRequest
+	var err error
+	if err = c.ShouldBindJSON(&jobQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err = r.paraValidator.Struct(jobQuery); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	job, err := r.jobManager.BatchGetJobs(context.TODO(), jobQuery.GetJobIdentity(), jobQuery.IDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -116,6 +116,7 @@ type (
 		AcceptableJob(ctx context.Context, j Job) JobKind
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
+		BatchGetJobs(ctx context.Context, jobID JobIdentity, IDs []string) ([]Job, error)
 		StartLoop() error
 		RegisterJobChangeNotifyChannel(ch chan<- Job)
 	}
@@ -149,6 +150,7 @@ type (
 		CreateJob(ctx context.Context, job *Job, ttl int64) error
 		UpdateJobStatus(ctx context.Context, job *Job, version int32) error
 		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
+		BatchGetJobs(ctx context.Context, jobID JobIdentity, IDs []string) ([]Job, error)
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		DeleteJobLog(ctx context.Context, jobID JobIdentity) error
 		InsertJobStepLog(ctx context.Context, log *JobStepLog, ttl int64) error

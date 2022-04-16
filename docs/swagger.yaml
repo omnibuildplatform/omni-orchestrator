@@ -31,6 +31,22 @@ definitions:
     - task
     - userID
     type: object
+  application.QueryJobRequest:
+    properties:
+      ID:
+        type: string
+      domain:
+        type: string
+      service:
+        type: string
+      task:
+        type: string
+    required:
+    - ID
+    - domain
+    - service
+    - task
+    type: object
   common.Job:
     properties:
       detail:
@@ -195,6 +211,30 @@ paths:
           schema:
             $ref: '#/definitions/common.Job'
       summary: Create Job
+      tags:
+      - Job
+  /jobs/batchQuery:
+    post:
+      consumes:
+      - application/json
+      description: Query multiple job status
+      parameters:
+      - description: body for query multiple jobs
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/application.QueryJobRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/common.Job'
+            type: array
+      summary: Query Job Status
       tags:
       - Job
   /jobs/logs:

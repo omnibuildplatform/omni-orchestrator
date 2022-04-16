@@ -814,7 +814,6 @@ func (e *Engine) GetJobEventChannel() <-chan common.JobIdentity {
 
 func (e *Engine) FetchJobStepLog(ctx context.Context, jobID common.JobIdentity, stepName string) (io.ReadCloser, error) {
 	ns := e.ConvertToNamespace(jobID.Domain)
-	fmt.Println(jobID)
 	pods, err := e.GetClientSet(jobID.ExtraIdentities).CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("job-name=%s", jobID.ID),
 	})

@@ -60,7 +60,7 @@ const (
 		`and task = ? ` +
 		`and domain = ? ` +
 		`and job_date = ? ` +
-		`and job_id = ?`
+		`and job_id IN ? `
 
 	GetJobLogQueryTemplate = `SELECT log_time, data ` +
 		`FROM log_info ` +
@@ -224,70 +224,145 @@ func (s *Store) DeleteJobLog(ctx context.Context, jobID common.JobIdentity) erro
 	return query.Exec()
 }
 
+func (s *Store) BatchGetJobs(ctx context.Context, jobID common.JobIdentity, IDs []string) ([]common.Job, error) {
+	jobDataMap := make(map[string][]string)
+	var jobs []common.Job
+	for _, id := range IDs {
+		jobDate, err := s.getJobDateStringFromID(id)
+		if err != nil {
+			s.logger.Warn(fmt.Sprintf("job ID %s format is invalid, will be skipped, error %s", id, err))
+			continue
+		}
+		if _, ok := jobDataMap[jobDate]; ok {
+			jobDataMap[jobDate] = append(jobDataMap[jobDate], id)
+		} else {
+			jobDataMap[jobDate] = []string{id}
+		}
+	}
+	for date, ids := range jobDataMap {
+		jobsPart, err := s.getJobs(ctx, jobID.Service, jobID.Task, jobID.Domain, date, ids)
+		if err != nil {
+			return []common.Job{}, err
+		}
+		jobs = append(jobs, jobsPart...)
+	}
+	return jobs, nil
+}
+
 func (s *Store) GetJob(ctx context.Context, jobID common.JobIdentity) (common.Job, error) {
 	jobDate, err := s.getJobDateStringFromID(jobID.ID)
 	if err != nil {
 		return common.Job{}, err
 	}
-	query := s.session.Query(GetJobQueryTemplate, jobID.Service, jobID.Task, jobID.Domain, jobDate, jobID.ID).WithContext(context.TODO())
-	result := make(map[string]interface{})
-	if err := query.MapScan(result); err != nil {
+	jobs, err := s.getJobs(ctx, jobID.Service, jobID.Task, jobID.Domain, jobDate, []string{jobID.ID})
+	if err != nil {
 		return common.Job{}, err
 	}
-	job := common.Job{
-		JobIdentity: jobID,
+	if len(jobs) == 0 {
+		return common.Job{}, errors.New("job not found")
 	}
-	if value, ok := (result["user_id"]).(string); ok {
-		job.UserID = value
-	} else {
-		s.logger.Warn("unable to decode job user id")
+	return jobs[0], nil
+}
+
+func (s *Store) getJobs(ctx context.Context, service, task, domain, date string, IDs []string) ([]common.Job, error) {
+	var jobs []common.Job
+	query := s.session.Query(GetJobQueryTemplate, service, task, domain, date, IDs).PageSize(len(IDs)).WithContext(context.TODO())
+	iter := query.Iter()
+	if iter == nil {
+		return []common.Job{}, errors.New("unable to find job, iter empty")
 	}
-	if value, ok := (result["engine"]).(string); ok {
-		job.Engine = value
-	} else {
-		s.logger.Warn("unable to decode job engine")
+	for {
+		result := make(map[string]interface{})
+		if !iter.MapScan(result) {
+			break
+		} else {
+			job := common.Job{}
+			//service
+			if value, ok := (result["service"]).(string); ok {
+				job.Service = value
+			} else {
+				s.logger.Warn("unable to decode job service")
+			}
+			//task
+			if value, ok := (result["task"]).(string); ok {
+				job.Task = value
+			} else {
+				s.logger.Warn("unable to decode job task")
+			}
+			//domain
+			if value, ok := (result["domain"]).(string); ok {
+				job.Domain = value
+			} else {
+				s.logger.Warn("unable to decode job domain")
+			}
+			//job ID
+			if value, ok := (result["job_id"]).(gocql.UUID); ok {
+				job.ID = value.String()
+			} else {
+				s.logger.Warn("unable to decode job ID")
+			}
+			//user ID
+			if value, ok := (result["user_id"]).(string); ok {
+				job.UserID = value
+			} else {
+				s.logger.Warn("unable to decode job user id")
+			}
+			//engine
+			if value, ok := (result["engine"]).(string); ok {
+				job.Engine = value
+			} else {
+				s.logger.Warn("unable to decode job engine")
+			}
+			//started_time
+			if value, ok := (result["started_time"]).(time.Time); ok {
+				job.StartTime = value
+			} else {
+				s.logger.Warn("unable to decode job start time")
+			}
+			//finished_time
+			if value, ok := (result["finished_time"]).(time.Time); ok {
+				job.EndTime = value
+			} else {
+				s.logger.Warn("unable to decode job finish time")
+			}
+			//state
+			if value, ok := (result["state"]).(string); ok {
+				job.State = common.JobState(value)
+			} else {
+				s.logger.Warn("unable to decode job state")
+			}
+			//detail
+			if value, ok := (result["detail"]).(string); ok {
+				job.Detail = value
+			} else {
+				s.logger.Warn("unable to decode job detail")
+			}
+			//version
+			if value, ok := (result["version"]).(int); ok {
+				job.Version = int32(value)
+			} else {
+				s.logger.Warn("unable to decode job version")
+			}
+			//append steps
+			stepsDB, ok := result["steps"].([]map[string]interface{})
+			if ok {
+				job.Steps = s.collectJobSteps(stepsDB)
+			} else {
+				s.logger.Warn("unable to decode job steps")
+			}
+			//append specs
+			var spec map[string]interface{}
+			err := json.Unmarshal(result["spec"].([]byte), &spec)
+			if err != nil {
+				s.logger.Warn(fmt.Sprintf("unable to job spec into struct %s", err))
+			} else {
+				job.Spec = spec
+			}
+			jobs = append(jobs, job)
+
+		}
 	}
-	if value, ok := (result["started_time"]).(time.Time); ok {
-		job.StartTime = value
-	} else {
-		s.logger.Warn("unable to decode job start time")
-	}
-	if value, ok := (result["finished_time"]).(time.Time); ok {
-		job.EndTime = value
-	} else {
-		s.logger.Warn("unable to decode job finish time")
-	}
-	if value, ok := (result["state"]).(string); ok {
-		job.State = common.JobState(value)
-	} else {
-		s.logger.Warn("unable to decode job state")
-	}
-	if value, ok := (result["detail"]).(string); ok {
-		job.Detail = value
-	} else {
-		s.logger.Warn("unable to decode job detail")
-	}
-	if value, ok := (result["version"]).(int); ok {
-		job.Version = int32(value)
-	} else {
-		s.logger.Warn("unable to decode job version")
-	}
-	//append steps
-	stepsDB, ok := result["steps"].([]map[string]interface{})
-	if ok {
-		job.Steps = s.collectJobSteps(stepsDB)
-	} else {
-		s.logger.Warn("unable to decode job steps")
-	}
-	//append specs
-	var spec map[string]interface{}
-	err = json.Unmarshal(result["spec"].([]byte), &spec)
-	if err != nil {
-		s.logger.Warn(fmt.Sprintf("unable to job spec into struct %s", err))
-	} else {
-		job.Spec = spec
-	}
-	return job, nil
+	return jobs, nil
 }
 
 func (s *Store) collectJobSteps(dbSteps []map[string]interface{}) []common.Step {
