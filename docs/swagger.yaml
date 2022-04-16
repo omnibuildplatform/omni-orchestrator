@@ -41,6 +41,10 @@ definitions:
         type: string
       engine:
         type: string
+      extraIdentities:
+        additionalProperties:
+          type: string
+        type: object
       id:
         type: string
       service:

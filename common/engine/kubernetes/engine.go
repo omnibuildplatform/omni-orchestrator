@@ -26,11 +26,13 @@ import (
 )
 
 const (
+	ArchitectureKey           = "architecture"
 	AppLabelKey               = "omni-orchestrator"
 	AppLabelValue             = "true"
 	AnnotationService         = "omni-tag/service"
 	AnnotationDomain          = "omni-tag/domain"
 	AnnotationTask            = "omni-tag/task"
+	AnnotationArch            = "omni-tag/architecture"
 	DefaultSyncInterval       = 3
 	DefaultJobTTL             = 1800
 	DefaultJobRetry           = 0
@@ -55,51 +57,88 @@ type BuildImagePackages struct {
 }
 
 type Engine struct {
-	logger       *zap.Logger
-	clientSet    *kubernetes.Clientset
-	config       appconfig.Engine
-	factory      *informers.SharedInformerFactory
-	closeCh      chan struct{}
-	eventChannel chan common.JobIdentity
-	JobWatchMap  sync.Map
+	logger           *zap.Logger
+	config           appconfig.Engine
+	x86clientSet     *kubernetes.Clientset
+	aarch64clientSet *kubernetes.Clientset
+	x86Factory       *informers.SharedInformerFactory
+	aarch64Factory   *informers.SharedInformerFactory
+	closeCh          chan struct{}
+	eventChannel     chan common.JobIdentity
+	JobWatchMap      sync.Map
 }
 
 func NewEngine(config appconfig.Engine, logger *zap.Logger) (common.JobEngine, error) {
-	k8sConfig, err := clientcmd.BuildConfigFromFlags("", config.ConfigFile)
+	var x86clientSet, aarch64ClientSet *kubernetes.Clientset
+	var x86Factory, aarch64Factory *informers.SharedInformerFactory
+	//x86 client will try to use in cluster mode
+	x86k8sConfig, err := clientcmd.BuildConfigFromFlags("", config.X86ConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	clientSet, err := kubernetes.NewForConfig(k8sConfig)
-	factory := informers.NewSharedInformerFactoryWithOptions(clientSet, DefaultSyncInterval*time.Second,
+	x86clientSet, err = kubernetes.NewForConfig(x86k8sConfig)
+	if err != nil {
+		return nil, err
+	}
+	factory1 := informers.NewSharedInformerFactoryWithOptions(x86clientSet, DefaultSyncInterval*time.Second,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = fmt.Sprintf("%s=%s", AppLabelKey, AppLabelValue)
 		}))
-	if err != nil {
-		return nil, err
+	x86Factory = &factory1
+	if config.Aarch64ConfigFile != "" {
+		aarch64Config, err := clientcmd.BuildConfigFromFlags("", config.Aarch64ConfigFile)
+		if err != nil {
+			return nil, err
+		}
+		aarch64ClientSet, err = kubernetes.NewForConfig(aarch64Config)
+		if err != nil {
+			return nil, err
+		}
+		factory2 := informers.NewSharedInformerFactoryWithOptions(aarch64ClientSet, DefaultSyncInterval*time.Second,
+			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+				options.LabelSelector = fmt.Sprintf("%s=%s", AppLabelKey, AppLabelValue)
+			}))
+		aarch64Factory = &factory2
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		logger.Info("aarch64 kubernetes engine not configured")
 	}
 	return &Engine{
-		logger:       logger,
-		config:       config,
-		clientSet:    clientSet,
-		factory:      &factory,
-		closeCh:      make(chan struct{}),
-		eventChannel: make(chan common.JobIdentity, DefaultEventChannel),
-		JobWatchMap:  sync.Map{},
+		logger:           logger,
+		config:           config,
+		x86clientSet:     x86clientSet,
+		aarch64clientSet: aarch64ClientSet,
+		x86Factory:       x86Factory,
+		aarch64Factory:   aarch64Factory,
+		closeCh:          make(chan struct{}),
+		eventChannel:     make(chan common.JobIdentity, DefaultEventChannel),
+		JobWatchMap:      sync.Map{},
 	}, nil
 }
 
 func (e *Engine) Initialize() error {
-	v, err := e.clientSet.ServerVersion()
-	if err != nil {
-		return err
+	if e.x86clientSet != nil {
+		v, err := e.x86clientSet.ServerVersion()
+		if err != nil {
+			return err
+		}
+		e.logger.Info(fmt.Sprintf("x86 kubernetes connected %s", v.String()))
 	}
-
-	e.logger.Info(fmt.Sprintf("kubernetes connected %s", v.String()))
+	if e.aarch64clientSet != nil {
+		v, err := e.aarch64clientSet.ServerVersion()
+		if err != nil {
+			return err
+		}
+		e.logger.Info(fmt.Sprintf("aarch64 kubernetes connected %s", v.String()))
+	}
 	return nil
 }
 
-func (e *Engine) CreateNamespaceIfNeeded(ns string) error {
-	_, err := e.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+func (e *Engine) CreateNamespaceIfNeeded(id *common.JobIdentity) error {
+	ns := e.ConvertToNamespace(id.Domain)
+	_, err := e.GetClientSet(id.ExtraIdentities).CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			namespace := v1.Namespace{
@@ -111,7 +150,7 @@ func (e *Engine) CreateNamespaceIfNeeded(ns string) error {
 					Labels: e.generateSystemLabels(),
 				},
 			}
-			_, err := e.clientSet.CoreV1().Namespaces().Create(context.TODO(), &namespace, metav1.CreateOptions{})
+			_, err := e.GetClientSet(id.ExtraIdentities).CoreV1().Namespaces().Create(context.TODO(), &namespace, metav1.CreateOptions{})
 			if err != nil {
 				return err
 			}
@@ -136,7 +175,7 @@ func (e *Engine) GetSupportedJobs() []common.JobKind {
 	return []common.JobKind{common.JobImageBuild}
 }
 
-func (e *Engine) prepareJobConfigmap(job *common.Job, spec common.JobImageBuildPara) (string, error) {
+func (e *Engine) prepareJobConfigmap(job *common.JobIdentity, spec common.JobImageBuildPara) (string, error) {
 	pkg := BuildImagePackages{
 		Packages: spec.Packages,
 	}
@@ -157,15 +196,15 @@ func (e *Engine) prepareJobConfigmap(job *common.Job, spec common.JobImageBuildP
 			DefaultImageConfigFile:    fmt.Sprintf(DefaultImageConfig, spec.Version),
 		},
 	}
-	_, err = e.clientSet.CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
+	_, err = e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), &configMap, metav1.CreateOptions{})
+		newConfigmap, err := e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), &configMap, metav1.CreateOptions{})
 		if err != nil {
 			return "", nil
 		}
 		return newConfigmap.Name, nil
 	} else if err == nil {
-		newConfigmap, err := e.clientSet.CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), &configMap, metav1.UpdateOptions{})
+		newConfigmap, err := e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), &configMap, metav1.UpdateOptions{})
 		if err != nil {
 			return "", nil
 		}
@@ -174,11 +213,12 @@ func (e *Engine) prepareJobConfigmap(job *common.Job, spec common.JobImageBuildP
 	return "", err
 }
 
-func (e *Engine) generateSystemAnnotations(job *common.Job) map[string]string {
+func (e *Engine) generateSystemAnnotations(job *common.JobIdentity) map[string]string {
 	return map[string]string{
 		AnnotationService: job.Service,
 		AnnotationTask:    job.Task,
 		AnnotationDomain:  job.Domain,
+		AnnotationArch:    e.getArchitectureKey(job.ExtraIdentities),
 	}
 }
 
@@ -186,7 +226,9 @@ func (e *Engine) hasSystemAnnotations(annotations map[string]string) bool {
 	if _, ok := annotations[AnnotationService]; ok {
 		if _, ok := annotations[AnnotationTask]; ok {
 			if _, ok := annotations[AnnotationDomain]; ok {
-				return true
+				if _, ok := annotations[AnnotationArch]; ok {
+					return true
+				}
 			}
 		}
 	}
@@ -198,7 +240,7 @@ func (e *Engine) generateSystemLabels() map[string]string {
 		AppLabelKey: AppLabelValue,
 	}
 }
-func (e *Engine) generateBuildOSImageJob(job *common.Job, spec common.JobImageBuildPara, configmapName string) *batchv1.Job {
+func (e *Engine) generateBuildOSImageJob(job *common.JobIdentity, spec common.JobImageBuildPara, configmapName string) *batchv1.Job {
 	jobTTLSecondsAfterFinished := int32(DefaultJobTTL)
 	jobRetry := int32(DefaultJobRetry)
 	privileged := true
@@ -320,29 +362,66 @@ func (e *Engine) ConvertToNamespace(domain string) string {
 	return strings.Replace(strings.ToLower(domain), ".", "-", -1)
 }
 
+func (e *Engine) getArchitectureKey(attrs map[string]string) string {
+	if len(attrs) == 0 {
+		return "x86"
+	}
+	if v, ok := attrs[ArchitectureKey]; !ok {
+		return "x86"
+	} else {
+		return v
+	}
+}
+
+func (e *Engine) GetClientSet(attrs map[string]string) *kubernetes.Clientset {
+	key := e.getArchitectureKey(attrs)
+	switch key {
+	case "x86":
+		return e.x86clientSet
+	case "aarch64":
+		return e.aarch64clientSet
+	default:
+		e.logger.Error(fmt.Sprintf("unable to find related kubernetes clientset %s, will use x86 as default", key))
+		return e.x86clientSet
+	}
+}
+
+func (e *Engine) GetKubernetesJobIdentity(job *common.Job, architecture string) common.JobIdentity {
+	return common.JobIdentity{
+		Service: job.Service,
+		Task:    job.Task,
+		Domain:  job.Domain,
+		ID:      job.ID,
+		ExtraIdentities: map[string]string{
+			ArchitectureKey: strings.ToLower(architecture),
+		},
+	}
+}
+
 func (e *Engine) BuildOSImage(ctx context.Context, job *common.Job, spec common.JobImageBuildPara) error {
 	var err error
+	jobId := e.GetKubernetesJobIdentity(job, spec.Architecture)
 	//prepare namespace
-	err = e.CreateNamespaceIfNeeded(e.ConvertToNamespace(job.Domain))
+	err = e.CreateNamespaceIfNeeded(&jobId)
 	if err != nil {
 		return err
 	}
 	//prepare configmap
-	configMapName, err := e.prepareJobConfigmap(job, spec)
+	configMapName, err := e.prepareJobConfigmap(&jobId, spec)
 	if err != nil {
 		return err
 	}
 	//prepare job resource
-	jobResource := e.generateBuildOSImageJob(job, spec, configMapName)
-	_, err = e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
+	jobResource := e.generateBuildOSImageJob(&jobId, spec, configMapName)
+	_, err = e.GetClientSet(jobId.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		_, err := e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), jobResource, metav1.CreateOptions{})
+		_, err := e.GetClientSet(jobId.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), jobResource, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 		return nil
 	} else if err == nil {
-		_, err = e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), jobResource, metav1.UpdateOptions{})
+		_, err = e.GetClientSet(jobId.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), jobResource, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -351,8 +430,9 @@ func (e *Engine) BuildOSImage(ctx context.Context, job *common.Job, spec common.
 	return err
 }
 
-func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[string]string) (string, string, string) {
+func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[string]string) (string, string, string, map[string]string) {
 	var service, task, domain string
+	extraIDs := make(map[string]string)
 	if value, ok := annotations[AnnotationService]; !ok {
 		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
 			namespace, name, AnnotationService))
@@ -374,14 +454,20 @@ func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[s
 	} else {
 		domain = value
 	}
-	return service, task, domain
+	if value, ok := annotations[AnnotationArch]; !ok {
+		e.logger.Warn(fmt.Sprintf("job %s/%s event has been dropped due to '%s' not found",
+			namespace, name, AnnotationArch))
+	} else {
+		extraIDs[ArchitectureKey] = value
+	}
+	return service, task, domain, extraIDs
 }
 
 func (e *Engine) GetJobStatus(ctx context.Context, jobID common.JobIdentity) (*common.Job, error) {
 	jobResource := common.Job{
 		JobIdentity: jobID,
 	}
-	existing, err := e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(jobID.Domain)).Get(context.TODO(), jobID.ID, metav1.GetOptions{})
+	existing, err := e.GetClientSet(jobID.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(jobID.Domain)).Get(context.TODO(), jobID.ID, metav1.GetOptions{})
 	if err == nil {
 		completionRequired := existing.Spec.Completions
 		backoffLimitRequired := existing.Spec.BackoffLimit
@@ -410,17 +496,17 @@ func (e *Engine) GetJobStatus(ctx context.Context, jobID common.JobIdentity) (*c
 				}
 			}
 		}
-		jobResource.Service, jobResource.Task, jobResource.Domain = e.collectJobAnnotations(
+		jobResource.Service, jobResource.Task, jobResource.Domain, jobResource.ExtraIdentities = e.collectJobAnnotations(
 			jobID.Domain, jobID.ID, existing.Annotations)
 		//append steps
-		jobResource.Steps = e.CollectSteps(existing)
+		jobResource.Steps = e.CollectSteps(jobID, existing)
 		return &jobResource, nil
 	}
 	return nil, err
 }
 
 func (e *Engine) DeleteJob(ctx context.Context, jobID common.JobIdentity) error {
-	err := e.clientSet.BatchV1().Jobs(e.ConvertToNamespace(jobID.Domain)).Delete(ctx, jobID.ID, metav1.DeleteOptions{})
+	err := e.GetClientSet(jobID.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(jobID.Domain)).Delete(ctx, jobID.ID, metav1.DeleteOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			e.logger.Warn(fmt.Sprintf("unable to delete job %s/%s in kubernetes, it may be deleted before",
@@ -429,27 +515,28 @@ func (e *Engine) DeleteJob(ctx context.Context, jobID common.JobIdentity) error 
 		}
 		return err
 	}
-	e.DeleteJobRelatedResource(e.ConvertToNamespace(jobID.Domain), jobID.ID)
+	e.DeleteJobRelatedResource(&jobID)
 	return nil
 }
 
-func (e *Engine) DeleteJobRelatedResource(namespace, name string) {
+func (e *Engine) DeleteJobRelatedResource(jobID *common.JobIdentity) {
 	//delete configmap
-	err := e.clientSet.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	ns := e.ConvertToNamespace(jobID.Domain)
+	err := e.GetClientSet(jobID.ExtraIdentities).CoreV1().ConfigMaps(ns).Delete(context.TODO(), jobID.ID, metav1.DeleteOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			e.logger.Info(fmt.Sprintf("unable to delete job configmap %s/%s in kubernetes, it may be deleted before",
-				namespace, name))
+				ns, jobID.ID))
 		} else {
 			e.logger.Warn(fmt.Sprintf("unable to delete job configmap %s/%s in kubernetes, error: %s",
-				namespace, name, err))
+				ns, jobID.ID, err))
 		}
 	} else {
-		e.logger.Info(fmt.Sprintf("Job %s/%s related configmap has been deleted", namespace, name))
+		e.logger.Info(fmt.Sprintf("Job %s/%s related configmap has been deleted", ns, jobID.ID))
 	}
 	//delete pod
-	pods, err := e.clientSet.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("job-name=%s", name),
+	pods, err := e.GetClientSet(jobID.ExtraIdentities).CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", jobID.ID),
 	})
 	if len(pods.Items) != 0 {
 		graceful := int64(10)
@@ -457,25 +544,25 @@ func (e *Engine) DeleteJobRelatedResource(namespace, name string) {
 			GracePeriodSeconds: &graceful,
 		}
 		for _, pd := range pods.Items {
-			err := e.clientSet.CoreV1().Pods(pd.Namespace).Delete(context.TODO(), pd.Name, delOption)
+			err := e.GetClientSet(jobID.ExtraIdentities).CoreV1().Pods(pd.Namespace).Delete(context.TODO(), pd.Name, delOption)
 			if err == nil {
-				e.logger.Info(fmt.Sprintf("job pod %s/%s has been deleted", namespace, name))
+				e.logger.Info(fmt.Sprintf("job pod %s/%s has been deleted", ns, jobID.ID))
 			} else {
 				if errors.IsNotFound(err) {
 					e.logger.Info(fmt.Sprintf("unable to delete job pod %s/%s in kubernetes, it may be deleted before",
-						namespace, name))
+						ns, jobID.ID))
 				} else {
 					e.logger.Warn(fmt.Sprintf("unable to delete job pod %s/%s in kubernetes, error: %s",
-						namespace, name, err))
+						ns, jobID.ID, err))
 				}
 			}
 		}
 	}
 }
 
-func (e *Engine) CollectSteps(job *batchv1.Job) []common.Step {
+func (e *Engine) CollectSteps(jobID common.JobIdentity, job *batchv1.Job) []common.Step {
 	var steps []common.Step
-	pods, err := e.clientSet.CoreV1().Pods(job.Namespace).List(context.TODO(), metav1.ListOptions{
+	pods, err := e.GetClientSet(jobID.ExtraIdentities).CoreV1().Pods(job.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("job-name=%s", job.Name),
 	})
 	if err != nil {
@@ -514,7 +601,7 @@ func (e *Engine) CollectSteps(job *batchv1.Job) []common.Step {
 func (e *Engine) TriggerJobEvent(namespace, name string, annotations map[string]string) {
 	event := common.JobIdentity{}
 	event.ID = name
-	event.Service, event.Task, event.Domain = e.collectJobAnnotations(namespace, name, annotations)
+	event.Service, event.Task, event.Domain, event.ExtraIdentities = e.collectJobAnnotations(namespace, name, annotations)
 	e.eventChannel <- event
 }
 
@@ -563,9 +650,9 @@ func (e *Engine) ConfigmapAddEvent(obj interface{}) {
 	//all configmap created one hour before will take into account
 	if configmap.CreationTimestamp.Time.Before(time.Now().Add(-1 * time.Minute * 60)) {
 		if _, ok := e.JobWatchMap.Load(configmap.Name); !ok {
-			_, err := e.clientSet.BatchV1().Jobs(configmap.Namespace).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
+			_, err := e.GetClientSet(configmap.Annotations).BatchV1().Jobs(configmap.Namespace).Get(context.TODO(), configmap.Name, metav1.GetOptions{})
 			if err != nil && errors.IsNotFound(err) {
-				err = e.clientSet.CoreV1().ConfigMaps(configmap.Namespace).Delete(context.TODO(),
+				err = e.GetClientSet(configmap.Annotations).CoreV1().ConfigMaps(configmap.Namespace).Delete(context.TODO(),
 					configmap.Name, metav1.DeleteOptions{})
 				if err != nil {
 					e.logger.Warn(fmt.Sprintf("Unable to delete orphan configmap %s/%s, error %s.",
@@ -582,7 +669,10 @@ func (e *Engine) JobDeleteEvent(obj interface{}) {
 	job := obj.(*batchv1.Job)
 	e.logger.Info(fmt.Sprintf("job %s/%s has been deleted", job.Namespace, job.Name))
 	//remove job related resource
-	e.DeleteJobRelatedResource(job.Namespace, job.Name)
+	jobID := common.JobIdentity{}
+	jobID.ID = job.Name
+	jobID.Service, jobID.Task, jobID.Domain, jobID.ExtraIdentities = e.collectJobAnnotations(job.Namespace, job.Name, job.Annotations)
+	e.DeleteJobRelatedResource(&jobID)
 	e.JobWatchMap.Delete(job.Name)
 }
 
@@ -603,9 +693,25 @@ func (e *Engine) engineControlledFilter(obj interface{}) bool {
 }
 
 func (e *Engine) StartLoop() error {
-	jobInformers := (*e.factory).Batch().V1().Jobs().Informer()
-	podInformers := (*e.factory).Core().V1().Pods().Informer()
-	configmapInformers := (*e.factory).Core().V1().ConfigMaps().Informer()
+	if e.x86Factory != nil {
+		err := e.startX86Loop()
+		if err != nil {
+			return err
+		}
+	}
+	if e.aarch64Factory != nil {
+		err := e.startAarch64Loop()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (e *Engine) startX86Loop() error {
+	jobInformers := (*e.x86Factory).Batch().V1().Jobs().Informer()
+	podInformers := (*e.x86Factory).Core().V1().Pods().Informer()
+	configmapInformers := (*e.x86Factory).Core().V1().ConfigMaps().Informer()
 	jobInformers.AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: e.engineControlledFilter,
 		Handler: cache.ResourceEventHandlerFuncs{
@@ -634,21 +740,71 @@ func (e *Engine) StartLoop() error {
 	go configmapInformers.Run(e.closeCh)
 
 	if !cache.WaitForCacheSync(e.closeCh, jobInformers.HasSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for job caches to sync"))
+		runtime.HandleError(fmt.Errorf("timed out waiting for x86 job caches to sync"))
 		close(e.closeCh)
-		return fmt.Errorf("timed out waiting for job caches to sync")
+		return fmt.Errorf("timed out waiting for x86 job caches to sync")
 	}
 	if !cache.WaitForCacheSync(e.closeCh, podInformers.HasSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for pod caches to sync"))
+		runtime.HandleError(fmt.Errorf("timed out waiting for x86 pod caches to sync"))
 		close(e.closeCh)
-		return fmt.Errorf("timed out waiting for pod caches to sync")
+		return fmt.Errorf("timed out waiting for x86 pod caches to sync")
 	}
 	if !cache.WaitForCacheSync(e.closeCh, configmapInformers.HasSynced) {
-		runtime.HandleError(fmt.Errorf("timed out waiting for configmap caches to sync"))
+		runtime.HandleError(fmt.Errorf("timed out waiting for x86 configmap caches to sync"))
 		close(e.closeCh)
-		return fmt.Errorf("timed out waiting for configmap caches to sync")
+		return fmt.Errorf("timed out waiting for x86 configmap caches to sync")
 	}
-	e.logger.Info("kubernetes engine loop started")
+	e.logger.Info("x86 kubernetes engine loop started")
+	return nil
+}
+
+func (e *Engine) startAarch64Loop() error {
+	jobInformers := (*e.aarch64Factory).Batch().V1().Jobs().Informer()
+	podInformers := (*e.aarch64Factory).Core().V1().Pods().Informer()
+	configmapInformers := (*e.aarch64Factory).Core().V1().ConfigMaps().Informer()
+	jobInformers.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: e.engineControlledFilter,
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc:    e.JobAddEvent,
+			UpdateFunc: e.JobUpdateEvent,
+			DeleteFunc: e.JobDeleteEvent,
+		},
+	})
+	//Watch pod used for init container changes
+	podInformers.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: e.engineControlledFilter,
+		Handler: cache.ResourceEventHandlerFuncs{
+			UpdateFunc: e.PodUpdateEvent,
+		},
+	})
+	//Watch configmap used for cleanup
+	configmapInformers.AddEventHandler(cache.FilteringResourceEventHandler{
+		FilterFunc: e.engineControlledFilter,
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: e.ConfigmapAddEvent,
+		},
+	})
+
+	go jobInformers.Run(e.closeCh)
+	go podInformers.Run(e.closeCh)
+	go configmapInformers.Run(e.closeCh)
+
+	if !cache.WaitForCacheSync(e.closeCh, jobInformers.HasSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for aarch64 job caches to sync"))
+		close(e.closeCh)
+		return fmt.Errorf("timed out waiting for aarch64 job caches to sync")
+	}
+	if !cache.WaitForCacheSync(e.closeCh, podInformers.HasSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for aarch64 pod caches to sync"))
+		close(e.closeCh)
+		return fmt.Errorf("timed out waiting for aarch64 pod caches to sync")
+	}
+	if !cache.WaitForCacheSync(e.closeCh, configmapInformers.HasSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for aarch64 configmap caches to sync"))
+		close(e.closeCh)
+		return fmt.Errorf("timed out waiting for aarch64 configmap caches to sync")
+	}
+	e.logger.Info("aarch64 kubernetes engine loop started")
 	return nil
 }
 
@@ -656,21 +812,23 @@ func (e *Engine) GetJobEventChannel() <-chan common.JobIdentity {
 	return e.eventChannel
 }
 
-func (e *Engine) FetchJobStepLog(ctx context.Context, domain, jobID, stepName string) (io.ReadCloser, error) {
-	pods, err := e.clientSet.CoreV1().Pods(e.ConvertToNamespace(domain)).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("job-name=%s", jobID),
+func (e *Engine) FetchJobStepLog(ctx context.Context, jobID common.JobIdentity, stepName string) (io.ReadCloser, error) {
+	ns := e.ConvertToNamespace(jobID.Domain)
+	fmt.Println(jobID)
+	pods, err := e.GetClientSet(jobID.ExtraIdentities).CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", jobID.ID),
 	})
 	if err != nil {
-		e.logger.Warn(fmt.Sprintf("failed to list pods for job %s/%s, error: %s", domain, jobID, err))
+		e.logger.Warn(fmt.Sprintf("failed to list pods for job %s/%s, error: %s", ns, jobID.ID, err))
 		return nil, err
 	}
 	if len(pods.Items) == 0 {
-		e.logger.Warn(fmt.Sprintf("no pod found for job %s/%s.", domain, jobID))
-		return nil, syserror.New(fmt.Sprintf("no pod found for job %s/%s.", domain, jobID))
+		e.logger.Warn(fmt.Sprintf("no pod found for job %s/%s.", ns, jobID.ID))
+		return nil, syserror.New(fmt.Sprintf("no pod found for job %s/%s.", ns, jobID.ID))
 	}
 
 	runningPod := pods.Items[0]
-	req := e.clientSet.CoreV1().Pods(runningPod.Namespace).GetLogs(runningPod.Name, &v1.PodLogOptions{
+	req := e.GetClientSet(jobID.ExtraIdentities).CoreV1().Pods(runningPod.Namespace).GetLogs(runningPod.Name, &v1.PodLogOptions{
 		Container: stepName,
 		Follow:    true,
 	})

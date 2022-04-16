@@ -15,7 +15,8 @@ worker = 5
 ttl = 2592000
 [engine]
 pluginName = "kubernetes"
-configFile = "/Users/tommylike/.kube/infra-test.yaml"
+x86ConfigFile = "/Users/tommylike/.kube/infra-test.yaml"
+aarch64ConfigFile = "/Users/tommylike/.kube/infra-hk.yaml"
 imageTagForOSImageBuild = "tommylike/omni-worker:0.2.3"
 OmniRepoAddress = "http://omni-repository.omni-repository.svc.cluster.local"
 OmniRepoToken = "316462d0c029ba707ad2"
