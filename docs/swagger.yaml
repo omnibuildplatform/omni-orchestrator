@@ -8,6 +8,24 @@ definitions:
       tag:
         type: string
     type: object
+  application.BatchQueryJobRequest:
+    properties:
+      IDs:
+        items:
+          type: string
+        type: array
+      domain:
+        type: string
+      service:
+        type: string
+      task:
+        type: string
+    required:
+    - IDs
+    - domain
+    - service
+    - task
+    type: object
   application.CreateJobRequest:
     properties:
       domain:
@@ -30,22 +48,6 @@ definitions:
     - spec
     - task
     - userID
-    type: object
-  application.QueryJobRequest:
-    properties:
-      ID:
-        type: string
-      domain:
-        type: string
-      service:
-        type: string
-      task:
-        type: string
-    required:
-    - ID
-    - domain
-    - service
-    - task
     type: object
   common.Job:
     properties:
@@ -224,7 +226,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/application.QueryJobRequest'
+          $ref: '#/definitions/application.BatchQueryJobRequest'
       produces:
       - application/json
       responses:

@@ -230,7 +230,7 @@ func (r *Orchestrator) queryJob(c *gin.Context) {
 
 // QueryJobStatus godoc
 // @Summary Query Job Status
-// @Param body body QueryJobRequest true "body for query multiple jobs"
+// @Param body body BatchQueryJobRequest true "body for query multiple jobs"
 // @Description Query multiple job status
 // @Tags Job
 // @Accept json

@@ -192,7 +192,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/application.QueryJobRequest"
+                            "$ref": "#/definitions/application.BatchQueryJobRequest"
                         }
                     }
                 ],
@@ -294,6 +294,32 @@ const docTemplate = `{
                 }
             }
         },
+        "application.BatchQueryJobRequest": {
+            "type": "object",
+            "required": [
+                "IDs",
+                "domain",
+                "service",
+                "task"
+            ],
+            "properties": {
+                "IDs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "task": {
+                    "type": "string"
+                }
+            }
+        },
         "application.CreateJobRequest": {
             "type": "object",
             "required": [
@@ -322,29 +348,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "userID": {
-                    "type": "string"
-                }
-            }
-        },
-        "application.QueryJobRequest": {
-            "type": "object",
-            "required": [
-                "ID",
-                "domain",
-                "service",
-                "task"
-            ],
-            "properties": {
-                "ID": {
-                    "type": "string"
-                },
-                "domain": {
-                    "type": "string"
-                },
-                "service": {
-                    "type": "string"
-                },
-                "task": {
                     "type": "string"
                 }
             }
