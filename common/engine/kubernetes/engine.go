@@ -378,6 +378,8 @@ func (e *Engine) GetClientSet(attrs map[string]string) *kubernetes.Clientset {
 	switch key {
 	case "x86":
 		return e.x86clientSet
+	case "x86_64":
+		return e.x86clientSet
 	case "aarch64":
 		return e.aarch64clientSet
 	default:
