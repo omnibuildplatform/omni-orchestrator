@@ -501,7 +501,10 @@ func (e *Engine) GetJobStatus(ctx context.Context, jobID common.JobIdentity) (*c
 		jobResource.Service, jobResource.Task, jobResource.Domain, jobResource.ExtraIdentities = e.collectJobAnnotations(
 			jobID.Domain, jobID.ID, existing.Annotations)
 		//append steps
-		jobResource.Steps = e.CollectSteps(jobID, existing)
+		newSteps := e.CollectSteps(jobID, existing)
+		if len(newSteps) != 0 {
+			jobResource.Steps = e.CollectSteps(jobID, existing)
+		}
 		return &jobResource, nil
 	}
 	return nil, err
@@ -572,6 +575,7 @@ func (e *Engine) CollectSteps(jobID common.JobIdentity, job *batchv1.Job) []comm
 		return steps
 	}
 	if len(pods.Items) == 0 {
+		e.logger.Warn(fmt.Sprintf("failed to list pods for job %s/%s", job.Namespace, job.Name))
 		return steps
 	}
 	// Job will only execute once
