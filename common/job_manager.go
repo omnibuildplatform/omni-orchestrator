@@ -265,9 +265,10 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 				} else {
 					oldJob.StartTime = jobRes.StartTime
 					oldJob.EndTime = jobRes.EndTime
-					oldJob.Steps = jobRes.Steps
 					oldJob.State = jobRes.State
-					oldJob.Detail = jobRes.Detail
+					if len(jobRes.Steps) != 0 {
+						oldJob.Steps = jobRes.Steps
+					}
 					err := m.store.UpdateJobStatus(context.TODO(), &oldJob, oldJob.Version-1)
 					if err != nil {
 						m.logger.Error(fmt.Sprintf("failed to update job status to store due to: %s", err))
