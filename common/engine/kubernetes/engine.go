@@ -465,11 +465,11 @@ func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[s
 	return service, task, domain, extraIDs
 }
 
-func (e *Engine) GetJobStatus(ctx context.Context, jobID common.JobIdentity) (*common.Job, error) {
+func (e *Engine) GetJobStatus(ctx context.Context, job common.Job) (*common.Job, error) {
 	jobResource := common.Job{
-		JobIdentity: jobID,
+		JobIdentity: job.JobIdentity,
 	}
-	existing, err := e.GetClientSet(jobID.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(jobID.Domain)).Get(context.TODO(), jobID.ID, metav1.GetOptions{})
+	existing, err := e.GetClientSet(job.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
 	if err == nil {
 		completionRequired := existing.Spec.Completions
 		backoffLimitRequired := existing.Spec.BackoffLimit
@@ -499,11 +499,20 @@ func (e *Engine) GetJobStatus(ctx context.Context, jobID common.JobIdentity) (*c
 			}
 		}
 		jobResource.Service, jobResource.Task, jobResource.Domain, jobResource.ExtraIdentities = e.collectJobAnnotations(
-			jobID.Domain, jobID.ID, existing.Annotations)
+			job.Domain, job.ID, existing.Annotations)
 		//append steps
-		newSteps := e.CollectSteps(jobID, existing)
+		newSteps := e.CollectSteps(job.JobIdentity, existing)
 		if len(newSteps) != 0 {
-			jobResource.Steps = e.CollectSteps(jobID, existing)
+			jobResource.Steps = newSteps
+		}
+		// mark step failed if necessary
+		if jobResource.State == common.JobFailed {
+			for index, _ := range jobResource.Steps {
+				if jobResource.Steps[index].State == common.StepRunning || jobResource.Steps[index].State == common.StepCreated {
+					jobResource.Steps[index].State = common.StepFailed
+					jobResource.Steps[index].EndTime = time.Now()
+				}
+			}
 		}
 		return &jobResource, nil
 	}

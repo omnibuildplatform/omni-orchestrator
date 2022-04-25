@@ -249,7 +249,12 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 				return
 			}
 			m.logger.Info(fmt.Sprintf("worker %d received job %s/%s change event", index, job.Domain, job.ID))
-			jobRes, err := m.engine.GetJobStatus(context.TODO(), job)
+			oldJob, err := m.store.GetJob(context.TODO(), job)
+			if err != nil {
+				m.logger.Error(fmt.Sprintf("unable to get job info for update %s", err))
+				return
+			}
+			jobRes, err := m.engine.GetJobStatus(context.TODO(), oldJob)
 			if err != nil {
 				if k8serrors.IsNotFound(err) {
 					m.logger.Info(fmt.Sprintf("failed to get job %s/%s information, it maybe deleted",

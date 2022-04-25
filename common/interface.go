@@ -136,7 +136,7 @@ type (
 		GetName() string
 		GetSupportedJobs() []JobKind
 		BuildOSImage(ctx context.Context, job *Job, spec JobImageBuildPara) error
-		GetJobStatus(ctx context.Context, jobID JobIdentity) (*Job, error)
+		GetJobStatus(ctx context.Context, job Job) (*Job, error)
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		StartLoop() error
 		GetJobEventChannel() <-chan JobIdentity
