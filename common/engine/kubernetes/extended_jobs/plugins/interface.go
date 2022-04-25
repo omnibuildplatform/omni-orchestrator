@@ -1,4 +1,4 @@
-package extended_jobs
+package plugins
 
 import (
 	"go.uber.org/zap"

@@ -15,10 +15,10 @@ func NewEngine() (common.JobEngine, error) {
 func (e *Engine) GetName() string {
 	return "cadence"
 }
-func (e *Engine) GetSupportedJobs() []common.JobKind {
-	return []common.JobKind{}
+func (e *Engine) GetSupportedJobs() []string {
+	return []string{}
 }
-func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.JobImageBuildPara) error {
+func (e *Engine) BuildOSImage(ctx context.Context, job common.Job, spec common.JobImageBuildFromReleasePara) error {
 	return nil
 }
 

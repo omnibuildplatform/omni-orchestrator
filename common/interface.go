@@ -20,6 +20,7 @@ const (
 
 const (
 	LogCompleteFlag = "0F80573E-61DA-4C1B-9CDE-396F139D63DD"
+	JobUnrecognized = "unrecognized"
 )
 
 type StepState string
@@ -34,16 +35,8 @@ const (
 
 type JobKind string
 
-const (
-	JobImageBuild   JobKind = "buildImage"
-	JobRPMBuild     JobKind = "buildRPM"
-	JobUnrecognized JobKind = "unrecognized"
-)
-
-var AvailableJobs = []JobKind{JobImageBuild, JobRPMBuild}
-
 type (
-	JobImageBuildPara struct {
+	JobImageBuildFromReleasePara struct {
 		Version      string   `json:"version"`
 		Packages     []string `json:"packages"`
 		Format       string   `json:"format"`
@@ -112,8 +105,8 @@ type (
 	JobManager interface {
 		Closeable
 		GetName() string
-		CreateJob(ctx context.Context, j *Job, kind JobKind) error
-		AcceptableJob(ctx context.Context, j Job) JobKind
+		CreateJob(ctx context.Context, j *Job, kind string) error
+		AcceptableJob(ctx context.Context, j Job) string
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		GetJob(ctx context.Context, jobID JobIdentity) (Job, error)
 		BatchGetJobs(ctx context.Context, jobID JobIdentity, IDs []string) ([]Job, error)
@@ -134,8 +127,8 @@ type (
 		Closeable
 		Initialize() error
 		GetName() string
-		GetSupportedJobs() []JobKind
-		BuildOSImage(ctx context.Context, job *Job, spec JobImageBuildPara) error
+		GetSupportedJobs() []string
+		CreateJob(ctx context.Context, job *Job) error
 		GetJobStatus(ctx context.Context, job Job) (*Job, error)
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
 		StartLoop() error

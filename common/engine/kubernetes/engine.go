@@ -2,25 +2,27 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/json"
 	syserror "errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/omnibuildplatform/omni-orchestrator/common"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
+	_ "github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/buildimagefromrelease"
+	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/plugins"
 	"go.uber.org/zap"
 	"io"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -35,23 +37,7 @@ const (
 	AnnotationTask            = "omni-tag/task"
 	AnnotationArch            = "omni-tag/architecture"
 	DefaultSyncInterval       = 3
-	DefaultJobTTL             = 1800
-	DefaultJobRetry           = 0
 	DefaultEventChannel       = 200
-	DefaultPackagesConfigFile = "openEuler-customized.json"
-	DefaultImageConfigFile    = "conf.yaml"
-	DefaultDataVolumeSize     = "20G"
-	DefaultImageConfig        = `working_dir: /data/omni-workspace
-debug: True
-user_name: root
-user_passwd: openEuler
-installer_configs: /etc/omni-imager/installer_assets/calamares-configs
-systemd_configs: /etc/omni-imager/installer_assets/systemd-configs
-init_script: /etc/omni-imager/init
-installer_script: /etc/omni-imager/runinstaller
-repo_file: /etc/omni-imager/repos/%s.repo
-use_cached_rootfs: True
-cached_rootfs_gz: /data/rootfs_cache/rootfs.tar.gz`
 )
 
 type BuildImagePackages struct {
@@ -149,7 +135,7 @@ func (e *Engine) CreateNamespaceIfNeeded(id *common.JobIdentity) error {
 					Annotations: map[string]string{
 						"controlledBy": "omni-orchestrator",
 					},
-					Labels: e.generateSystemLabels(),
+					Labels: e.generateSystemLabels(map[string]string{}),
 				},
 			}
 			_, err := e.GetClientSet(id.ExtraIdentities).CoreV1().Namespaces().Create(context.TODO(), &namespace, metav1.CreateOptions{})
@@ -173,55 +159,20 @@ func (e *Engine) Close() {
 func (e *Engine) GetName() string {
 	return "kubernetes"
 }
-func (e *Engine) GetSupportedJobs() []common.JobKind {
-	return []common.JobKind{common.JobImageBuild}
+func (e *Engine) GetSupportedJobs() []string {
+	return plugins.GetRegisteredJobPluginNames()
 }
 
-func (e *Engine) prepareJobConfigmap(job *common.JobIdentity, spec common.JobImageBuildPara) (string, error) {
-	pkg := BuildImagePackages{
-		Packages: spec.Packages,
+func (e *Engine) generateSystemAnnotations(existing map[string]string, job *common.JobIdentity) map[string]string {
+	annotations := make(map[string]string)
+	for k, v := range existing {
+		annotations[k] = v
 	}
-	packages, err := json.MarshalIndent(pkg, "", "\t")
-	if err != nil {
-		return "", err
-	}
-	//prepare configmap
-	configMap := v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        job.ID,
-			Namespace:   e.ConvertToNamespace(job.Domain),
-			Annotations: e.generateSystemAnnotations(job),
-			Labels:      e.generateSystemLabels(),
-		},
-		Data: map[string]string{
-			DefaultPackagesConfigFile: string(packages),
-			DefaultImageConfigFile:    fmt.Sprintf(DefaultImageConfig, spec.Version),
-		},
-	}
-	_, err = e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		newConfigmap, err := e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), &configMap, metav1.CreateOptions{})
-		if err != nil {
-			return "", nil
-		}
-		return newConfigmap.Name, nil
-	} else if err == nil {
-		newConfigmap, err := e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), &configMap, metav1.UpdateOptions{})
-		if err != nil {
-			return "", nil
-		}
-		return newConfigmap.Name, nil
-	}
-	return "", err
-}
-
-func (e *Engine) generateSystemAnnotations(job *common.JobIdentity) map[string]string {
-	return map[string]string{
-		AnnotationService: job.Service,
-		AnnotationTask:    job.Task,
-		AnnotationDomain:  job.Domain,
-		AnnotationArch:    e.getArchitectureKey(job.ExtraIdentities),
-	}
+	annotations[AnnotationService] = job.Service
+	annotations[AnnotationTask] = job.Task
+	annotations[AnnotationDomain] = job.Domain
+	annotations[AnnotationArch] = e.getArchitectureKey(job.ExtraIdentities)
+	return annotations
 }
 
 func (e *Engine) hasSystemAnnotations(annotations map[string]string) bool {
@@ -237,131 +188,13 @@ func (e *Engine) hasSystemAnnotations(annotations map[string]string) bool {
 	return false
 }
 
-func (e *Engine) generateSystemLabels() map[string]string {
-	return map[string]string{
-		AppLabelKey: AppLabelValue,
+func (e *Engine) generateSystemLabels(existing map[string]string) map[string]string {
+	labels := make(map[string]string)
+	for k, v := range existing {
+		labels[k] = v
 	}
-}
-func (e *Engine) generateBuildOSImageJob(job *common.JobIdentity, spec common.JobImageBuildPara, configmapName string) *batchv1.Job {
-	jobTTLSecondsAfterFinished := int32(DefaultJobTTL)
-	jobRetry := int32(DefaultJobRetry)
-	privileged := true
-	quantity := resource.MustParse(DefaultDataVolumeSize)
-	return &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        job.ID,
-			Namespace:   e.ConvertToNamespace(job.Domain),
-			Annotations: e.generateSystemAnnotations(job),
-			Labels:      e.generateSystemLabels(),
-		},
-		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: &jobTTLSecondsAfterFinished,
-			BackoffLimit:            &jobRetry,
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels:      e.generateSystemLabels(),
-					Annotations: e.generateSystemAnnotations(job),
-				},
-				Spec: v1.PodSpec{
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						{
-							Name:  "job-completed",
-							Image: "alpine/curl",
-							Command: []string{
-								"echo", "job succeed",
-							},
-						},
-					},
-					InitContainers: []v1.Container{
-						{
-							Name:  "rootfs-download",
-							Image: "alpine/curl",
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      fmt.Sprintf("%s-data", job.ID),
-									MountPath: "/data/",
-								},
-							},
-							Command: []string{
-								"sh", "-c", fmt.Sprintf(
-									"mkdir -p /data/rootfs_cache; curl -vvv %s/data/browse/util/imager/rootfs.tar.gz -o /data/rootfs_cache/rootfs.tar.gz",
-									e.config.OmniRepoAddress),
-							},
-						},
-						{
-							Name:  "image-build",
-							Image: e.config.ImageTagForOSImageBuild,
-							SecurityContext: &v1.SecurityContext{
-								Privileged: &privileged,
-							},
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      fmt.Sprintf("%s-config", job.ID),
-									MountPath: fmt.Sprintf("/etc/omni-imager/%s", DefaultPackagesConfigFile),
-									SubPath:   DefaultPackagesConfigFile,
-								},
-								{
-									Name:      fmt.Sprintf("%s-config", job.ID),
-									MountPath: fmt.Sprintf("/etc/omni-imager/%s", DefaultImageConfigFile),
-									SubPath:   DefaultImageConfigFile,
-								},
-								{
-									Name:      fmt.Sprintf("%s-data", job.ID),
-									MountPath: "/data/",
-								},
-							},
-							Command: []string{
-								"omni-imager", "--package-list",
-								fmt.Sprintf("/etc/omni-imager/%s", DefaultPackagesConfigFile),
-								"--config-file", fmt.Sprintf("/etc/omni-imager/%s", DefaultImageConfigFile),
-								"--build-type", spec.Format, "--output-file", fmt.Sprintf("openEuler-%s.iso",
-									job.ID),
-							},
-						},
-						{
-							Name:  "image-upload",
-							Image: "alpine/curl",
-							VolumeMounts: []v1.VolumeMount{
-								{
-									Name:      fmt.Sprintf("%s-data", job.ID),
-									MountPath: "/data/",
-								},
-							},
-							Command: []string{
-								"curl", "-vvv", fmt.Sprintf("-Ffile=@/data/omni-workspace/openEuler-%s.iso", job.ID),
-								fmt.Sprintf("-Fproject=%s", spec.Version), "-FfileType=image",
-								fmt.Sprintf("%s/data/upload?token=%s", strings.TrimRight(e.config.OmniRepoAddress,
-									"/"), e.config.OmniRepoToken),
-							},
-						},
-					},
-					Volumes: []v1.Volume{
-						{
-							Name: fmt.Sprintf("%s-config", job.ID),
-							VolumeSource: v1.VolumeSource{
-								ConfigMap: &v1.ConfigMapVolumeSource{
-									LocalObjectReference: v1.LocalObjectReference{
-										Name: configmapName,
-									},
-								},
-							},
-						},
-						{
-							Name: fmt.Sprintf("%s-data", job.ID),
-							VolumeSource: v1.VolumeSource{
-								EmptyDir: &v1.EmptyDirVolumeSource{
-
-									SizeLimit: &quantity,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
+	labels[AppLabelKey] = AppLabelValue
+	return labels
 }
 
 func (e *Engine) ConvertToNamespace(domain string) string {
@@ -406,36 +239,97 @@ func (e *Engine) GetKubernetesJobIdentity(job *common.Job, architecture string) 
 	}
 }
 
-func (e *Engine) BuildOSImage(ctx context.Context, job *common.Job, spec common.JobImageBuildPara) error {
+func (e *Engine) createSingleResource(job *common.Job, resource interface{}) error {
 	var err error
-	jobId := e.GetKubernetesJobIdentity(job, spec.Architecture)
-	//prepare namespace
+	switch resource.(type) {
+	case *batchv1.Job:
+		//additional labels and annotations
+		k8sJob := resource.(*batchv1.Job)
+		k8sJob.Annotations = e.generateSystemAnnotations(k8sJob.Annotations, &job.JobIdentity)
+		k8sJob.Labels = e.generateSystemLabels(k8sJob.Labels)
+		k8sJob.Spec.Template.Annotations = e.generateSystemAnnotations(k8sJob.Spec.Template.Annotations, &job.JobIdentity)
+		k8sJob.Spec.Template.Labels = e.generateSystemLabels(k8sJob.Spec.Template.Labels)
+		_, err = e.GetClientSet(job.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err := e.GetClientSet(job.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), k8sJob, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		} else if err == nil {
+			_, err = e.GetClientSet(job.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), k8sJob, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+		return nil
+	case *v1.ConfigMap:
+		//additional labels and annotations
+		k8sConfigmap := resource.(*v1.ConfigMap)
+		k8sConfigmap.Annotations = e.generateSystemAnnotations(k8sConfigmap.Annotations, &job.JobIdentity)
+		k8sConfigmap.Labels = e.generateSystemLabels(k8sConfigmap.Labels)
+		_, err = e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err := e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), k8sConfigmap, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		} else if err == nil {
+			_, err := e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), k8sConfigmap, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	default:
+		e.logger.Warn(fmt.Sprintf("unsupported kubernetes resource %s", resource))
+	}
+	return nil
+}
+
+func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
+	var err error
+	var createdResource []interface{}
+	//1. initialize job handler
+	jobHandler, err := plugins.SupportedJobPlugins[job.Task].CreateJobHandler(path.Join(e.config.KubernetesTemplateFolder, strings.ToLower(job.Task)), e.logger)
+	if err != nil {
+		return err
+	}
+	err = jobHandler.Initialize(e.ConvertToNamespace(job.Domain), job.ID, job.Spec)
+	if err != nil {
+		return err
+	}
+	jobId := e.GetKubernetesJobIdentity(job, jobHandler.GetJobArchitecture())
+	//2. prepare namespace
 	err = e.CreateNamespaceIfNeeded(&jobId)
 	if err != nil {
 		return err
 	}
-	//prepare configmap
-	configMapName, err := e.prepareJobConfigmap(&jobId, spec)
-	if err != nil {
-		return err
-	}
-	//prepare job resource
-	jobResource := e.generateBuildOSImageJob(&jobId, spec, configMapName)
-	_, err = e.GetClientSet(jobId.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		_, err := e.GetClientSet(jobId.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Create(context.TODO(), jobResource, metav1.CreateOptions{})
+	//3. delete resource if failed creating
+	defer func() {
+		for _, r := range createdResource {
+			e.logger.Info(fmt.Sprintf("task creation revert, delete resource %s", r))
+			//TODO: please delete the resource
+		}
+	}()
+	//4. iterate yaml resource and create
+	for k, bytes := range jobHandler.GetAllSerializedObjects() {
+		decode := scheme.Codecs.UniversalDeserializer().Decode
+		rs, _, err := decode(bytes, nil, nil)
+		if err != nil {
+			return syserror.New(fmt.Sprintf("unable to decode kubernetes resource %s for job %s", k, job.Task))
+		}
+		fmt.Println(rs)
+		err = e.createSingleResource(job, rs)
 		if err != nil {
 			return err
 		}
-		return nil
-	} else if err == nil {
-		_, err = e.GetClientSet(jobId.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Update(context.TODO(), jobResource, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-		return nil
+		e.logger.Info(fmt.Sprintf("resource %s created for job %s/%s and type %s", k, job.Domain, job.ID, job.Task))
+		createdResource = append(createdResource, rs)
 	}
-	return err
+	return nil
 }
 
 func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[string]string) (string, string, string, map[string]string) {

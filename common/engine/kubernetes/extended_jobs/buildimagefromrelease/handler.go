@@ -1,16 +1,17 @@
 package buildimagefromrelease
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
-	"html/template"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 )
 
 type JobImageBuildFromReleasePara struct {
@@ -90,7 +91,7 @@ func (h *Handler) Initialize(namespace, name string, parameters map[string]inter
 	wrapPackages := BuildImagePackages{
 		Packages: h.paras.Packages,
 	}
-	packages, err := json.MarshalIndent(wrapPackages, "", "\t")
+	packages, err := json.Marshal(wrapPackages)
 	if err != nil {
 		return err
 	}
@@ -106,10 +107,12 @@ func (h *Handler) Initialize(namespace, name string, parameters map[string]inter
 		if err != nil {
 			return err
 		}
-		err = resourceTemplate.ExecuteTemplate(os.Stdout, k, variables)
+		buffer := new(bytes.Buffer)
+		err = resourceTemplate.ExecuteTemplate(buffer, k, variables)
 		if err != nil {
 			return err
 		}
+		h.templates[k] = buffer.Bytes()
 	}
 	return nil
 }
