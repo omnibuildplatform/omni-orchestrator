@@ -14,6 +14,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
@@ -39,6 +40,7 @@ const (
 	DefaultEventChannel       = 200
 	DefaultPackagesConfigFile = "openEuler-customized.json"
 	DefaultImageConfigFile    = "conf.yaml"
+	DefaultDataVolumeSize     = "20G"
 	DefaultImageConfig        = `working_dir: /data/omni-workspace
 debug: True
 user_name: root
@@ -244,6 +246,7 @@ func (e *Engine) generateBuildOSImageJob(job *common.JobIdentity, spec common.Jo
 	jobTTLSecondsAfterFinished := int32(DefaultJobTTL)
 	jobRetry := int32(DefaultJobRetry)
 	privileged := true
+	quantity := resource.MustParse(DefaultDataVolumeSize)
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        job.ID,
@@ -347,7 +350,10 @@ func (e *Engine) generateBuildOSImageJob(job *common.JobIdentity, spec common.Jo
 						{
 							Name: fmt.Sprintf("%s-data", job.ID),
 							VolumeSource: v1.VolumeSource{
-								EmptyDir: &v1.EmptyDirVolumeSource{},
+								EmptyDir: &v1.EmptyDirVolumeSource{
+
+									SizeLimit: &quantity,
+								},
 							},
 						},
 					},
@@ -466,55 +472,52 @@ func (e *Engine) collectJobAnnotations(namespace, name string, annotations map[s
 }
 
 func (e *Engine) GetJobStatus(ctx context.Context, job common.Job) (*common.Job, error) {
-	jobResource := common.Job{
-		JobIdentity: job.JobIdentity,
-	}
 	existing, err := e.GetClientSet(job.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Get(context.TODO(), job.ID, metav1.GetOptions{})
 	if err == nil {
 		completionRequired := existing.Spec.Completions
 		backoffLimitRequired := existing.Spec.BackoffLimit
 		if existing.Status.Succeeded >= *completionRequired {
-			jobResource.State = common.JobSucceed
+			job.State = common.JobSucceed
 
 		} else if existing.Status.Failed > *backoffLimitRequired {
-			jobResource.State = common.JobFailed
+			job.State = common.JobFailed
 		} else {
-			jobResource.State = common.JobRunning
+			job.State = common.JobRunning
 		}
 		if existing.Status.StartTime != nil {
-			jobResource.StartTime = existing.Status.StartTime.Time
+			job.StartTime = existing.Status.StartTime.Time
 		}
 		// Find out job end time via CompletionTime or condition
-		if jobResource.State == common.JobSucceed {
+		if job.State == common.JobSucceed {
 			if existing.Status.CompletionTime != nil {
-				jobResource.EndTime = existing.Status.CompletionTime.Time
+				job.EndTime = existing.Status.CompletionTime.Time
 			}
 		}
-		if jobResource.State == common.JobFailed {
+		if job.State == common.JobFailed {
 			for _, c := range existing.Status.Conditions {
 				if c.Type == batchv1.JobFailed {
-					jobResource.EndTime = c.LastTransitionTime.Time
+					job.EndTime = c.LastTransitionTime.Time
 					break
 				}
 			}
 		}
-		jobResource.Service, jobResource.Task, jobResource.Domain, jobResource.ExtraIdentities = e.collectJobAnnotations(
+		job.Service, job.Task, job.Domain, job.ExtraIdentities = e.collectJobAnnotations(
 			job.Domain, job.ID, existing.Annotations)
 		//append steps
 		newSteps := e.CollectSteps(job.JobIdentity, existing)
 		if len(newSteps) != 0 {
-			jobResource.Steps = newSteps
+			job.Steps = newSteps
 		}
 		// mark step failed if necessary
-		if jobResource.State == common.JobFailed {
-			for index, _ := range jobResource.Steps {
-				if jobResource.Steps[index].State == common.StepRunning || jobResource.Steps[index].State == common.StepCreated {
-					jobResource.Steps[index].State = common.StepFailed
-					jobResource.Steps[index].EndTime = time.Now()
+		if job.State == common.JobFailed {
+			for index, _ := range job.Steps {
+				if job.Steps[index].State == common.StepRunning || job.Steps[index].State == common.StepCreated {
+					job.Steps[index].State = common.StepFailed
+					job.Steps[index].EndTime = time.Now()
 				}
 			}
 		}
-		return &jobResource, nil
+		return &job, nil
 	}
 	return nil, err
 }
