@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ index . "name" }}
+  namespace: {{ index . "namespace" }}
+spec:
+  backoffLimit: 0
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      containers:
+        - command:
+            - echo
+            - job succeed
+          image: alpine/curl
+          imagePullPolicy: Always
+          name: job-completed
+      dnsPolicy: ClusterFirst
+      initContainers:
+        - command:
+            - sh
+            - -c
+            - mkdir -p /data/rootfs_cache; curl -vvv http://omni-repository.omni-repository.svc.cluster.local/data/browse/util/imager/rootfs.tar.gz -o /data/rootfs_cache/rootfs.tar.gz
+          image: alpine/curl
+          imagePullPolicy: Always
+          name: rootfs-download
+          volumeMounts:
+            - mountPath: /data/
+              name: {{ index . "name" }}-data
+        - command:
+            - omni-imager
+            - --package-list
+            - /etc/omni-imager/openEuler-customized.json
+            - --config-file
+            - /etc/omni-imager/conf.yaml
+            - --build-type
+            - {{ index . "format" }}
+            - --output-file
+            - openEuler-{{ index . "name" }}.iso
+          image: tommylike/omni-worker:0.2.3
+          imagePullPolicy: IfNotPresent
+          name: image-build
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /etc/omni-imager/openEuler-customized.json
+              name: {{ index . "name" }}-config
+              subPath: openEuler-customized.json
+            - mountPath: /etc/omni-imager/conf.yaml
+              name: {{ index . "name" }}-config
+              subPath: conf.yaml
+            - mountPath: /data/
+              name: {{ index . "name" }}-data
+        - command:
+            - curl
+            - -vvv
+            - -Ffile=@/data/omni-workspace/openEuler-{{ index . "name" }}.iso
+            - -Fproject={{ index . "version" }}
+            - -FfileType=image
+            - http://omni-repository.omni-repository.svc.cluster.local/data/upload?token=316462d0c029ba707ad2
+          image: alpine/curl
+          imagePullPolicy: Always
+          name: image-upload
+          volumeMounts:
+            - mountPath: /data/
+              name: {{ index . "name" }}-data
+      restartPolicy: Never
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: {{ index . "name" }}
+          name: {{ index . "name" }}-config
+        - emptyDir:
+            sizeLimit: 20G
+          name: {{ index . "name" }}-data
+  ttlSecondsAfterFinished: 1800

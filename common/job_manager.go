@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/mitchellh/mapstructure"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
 	"go.uber.org/zap"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"strings"
 	"sync"
 	"time"
 )
@@ -73,7 +73,7 @@ func (m *jobManagerImpl) GetName() string {
 	return ""
 }
 
-func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind JobKind) error {
+func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind string) error {
 	var err error
 	err = m.store.CreateJob(ctx, job, m.jobTTL)
 	if err != nil {
@@ -81,14 +81,10 @@ func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind JobKind) 
 		m.store.DeleteJob(ctx, job.JobIdentity)
 		return err
 	}
-	switch kind {
-	case JobImageBuild:
-		err = m.createBuildISOJob(ctx, job)
-		if err != nil {
-			m.logger.Error(fmt.Sprintf("unable to create job in engine: %s", err))
-			return err
-		}
-		break
+	err = m.engine.CreateJob(ctx, job)
+	if err != nil {
+		m.store.DeleteJob(ctx, job.JobIdentity)
+		return err
 	}
 	oldJob, err := m.store.GetJob(ctx, job.JobIdentity)
 	if err != nil {
@@ -115,18 +111,7 @@ func (m *jobManagerImpl) CreateJob(ctx context.Context, job *Job, kind JobKind) 
 	return nil
 }
 
-func (m jobManagerImpl) createBuildISOJob(ctx context.Context, job *Job) error {
-	var err error
-	var para = JobImageBuildPara{}
-	err = mapstructure.Decode(job.Spec, &para)
-	if err != nil {
-		return errors.New(fmt.Sprintf("unable to decode job specification %s", err))
-	}
-	return m.engine.BuildOSImage(ctx, job, para)
-
-}
-
-func (m *jobManagerImpl) jobSupported(kind JobKind) bool {
+func (m *jobManagerImpl) jobSupported(kind string) bool {
 	for _, j := range m.engine.GetSupportedJobs() {
 		if kind == j {
 			return true
@@ -134,17 +119,15 @@ func (m *jobManagerImpl) jobSupported(kind JobKind) bool {
 	}
 	return false
 }
-func (m *jobManagerImpl) AcceptableJob(ctx context.Context, job Job) JobKind {
+func (m *jobManagerImpl) AcceptableJob(ctx context.Context, job Job) string {
 	if job.Engine != m.engine.GetName() {
 		m.logger.Info(fmt.Sprintf("configured engine %s while job asked for engine %s", m.engine.GetName(), job.Engine))
 		return JobUnrecognized
 	}
-	for _, j := range AvailableJobs {
-		if string(j) == job.Task && m.jobSupported(j) {
-			return j
-		}
+	if m.jobSupported(job.Task) {
+		return job.Task
 	}
-	m.logger.Info(fmt.Sprintf("configured engine doesn't support job task %s", job.Task))
+	m.logger.Info(fmt.Sprintf("configured engine doesn't support job task %s, available jobs are %s", job.Task, strings.Join(m.engine.GetSupportedJobs(), ",")))
 	return JobUnrecognized
 }
 func (m *jobManagerImpl) DeleteJob(ctx context.Context, jobID JobIdentity) error {
@@ -194,6 +177,16 @@ func (m *jobManagerImpl) Close() {
 	if m.store != nil {
 		m.store.Close()
 	}
+}
+
+func (m *jobManagerImpl) Reload() {
+	if m.engine != nil {
+		m.engine.Reload()
+	}
+	if m.store != nil {
+		m.store.Reload()
+	}
+	m.logger.Info("job manager configuration reloaded")
 }
 
 func (m *jobManagerImpl) StartLoop() error {

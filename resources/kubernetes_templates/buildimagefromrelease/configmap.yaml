@@ -1,0 +1,20 @@
+apiVersion: v1
+data:
+  conf.yaml: |-
+    working_dir: /data/omni-workspace
+    debug: True
+    user_name: root
+    user_passwd: openEuler
+    installer_configs: /etc/omni-imager/installer_assets/calamares-configs
+    systemd_configs: /etc/omni-imager/installer_assets/systemd-configs
+    init_script: /etc/omni-imager/init
+    installer_script: /etc/omni-imager/runinstaller
+    repo_file: /etc/omni-imager/repos/{{ index . "version" }}.repo
+    use_cached_rootfs: True
+    cached_rootfs_gz: /data/rootfs_cache/rootfs.tar.gz
+  openEuler-customized.json: |-
+    {{ index . "packages" }}
+kind: ConfigMap
+metadata:
+  name: {{ index . "name" }}
+  namespace: {{ index . "namespace" }}

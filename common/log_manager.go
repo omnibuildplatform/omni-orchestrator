@@ -86,6 +86,16 @@ func (l *logManagerImpl) Close() {
 	close(l.stepLogCh)
 }
 
+func (l *logManagerImpl) Reload() {
+	if l.engine != nil {
+		l.engine.Reload()
+	}
+	if l.store != nil {
+		l.store.Reload()
+	}
+	l.logger.Info("job manager configuration reloaded")
+}
+
 func (l *logManagerImpl) GetName() string {
 	return "log-manager"
 }

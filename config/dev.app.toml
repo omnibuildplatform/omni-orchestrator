@@ -20,6 +20,7 @@ aarch64ConfigFile = "/Users/tommylike/.kube/infra-hk.yaml"
 imageTagForOSImageBuild = "tommylike/omni-worker:0.2.3"
 OmniRepoAddress = "http://omni-repository.omni-repository.svc.cluster.local"
 OmniRepoToken = "316462d0c029ba707ad2"
+kubernetesTemplateFolder = "/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/resources/kubernetes_templates"
 [persistentStore]
 pluginName = "cassandra"
 hosts = "127.0.0.1"
