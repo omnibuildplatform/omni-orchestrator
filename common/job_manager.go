@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	DefaultJobTTL = 60 * 60 * 24 * 7
+	DefaultJobTTL    = 60 * 60 * 24 * 7
+	FlushChannelSize = 200
+	EventMapSize     = 10000
 )
 
 type jobChangeListener struct {
@@ -199,7 +201,7 @@ func (m *jobManagerImpl) StartLoop() error {
 		return errors.New("task engine is empty")
 	}
 	eventChannel := m.engine.GetJobEventChannel()
-	flushChannel := make(chan JobIdentity)
+	flushChannel := make(chan JobIdentity, FlushChannelSize)
 	// SyncRequestReduce used to reduce job query count
 	go m.SyncRequestReduce(flushChannel, eventChannel)
 	m.logger.Info(fmt.Sprintf("starting to initialzie %d job manager worker(s) to sync job status.",
@@ -217,7 +219,7 @@ func (m *jobManagerImpl) StartLoop() error {
 
 func (m *jobManagerImpl) SyncRequestReduce(flush chan<- JobIdentity, ch <-chan JobIdentity) {
 	ticker := time.NewTicker(time.Duration(m.config.SyncInterval) * time.Second)
-	jobEventMap := make(map[string]JobIdentity, 1000)
+	jobEventMap := make(map[string]JobIdentity, EventMapSize)
 	for {
 		select {
 		case job, ok := <-ch:
@@ -235,7 +237,7 @@ func (m *jobManagerImpl) SyncRequestReduce(flush chan<- JobIdentity, ch <-chan J
 			for _, e := range jobEventMap {
 				flush <- e
 			}
-			jobEventMap = make(map[string]JobIdentity, 1000)
+			jobEventMap = make(map[string]JobIdentity, EventMapSize)
 		}
 	}
 }
@@ -252,7 +254,7 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 			oldJob, err := m.store.GetJob(context.TODO(), job)
 			if err != nil {
 				m.logger.Error(fmt.Sprintf("unable to get job info for update %s", err))
-				return
+				break
 			}
 			jobRes, err := m.engine.GetJobStatus(context.TODO(), oldJob)
 			if err != nil {
@@ -260,7 +262,7 @@ func (m *jobManagerImpl) syncJobStatus(index int, ch <-chan JobIdentity) {
 					m.logger.Info(fmt.Sprintf("failed to get job %s/%s information, it maybe deleted",
 						job.Domain, job.ID))
 				} else {
-					m.logger.Warn(fmt.Sprintf("failed to get job %s/%s information %s", job.Domain, job.ID, err))
+					m.logger.Error(fmt.Sprintf("failed to get job %s/%s information %s", job.Domain, job.ID, err))
 				}
 			} else {
 				oldJob, err := m.store.GetJob(context.TODO(), jobRes.JobIdentity)
