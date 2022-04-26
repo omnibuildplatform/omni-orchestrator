@@ -89,6 +89,9 @@ type (
 	Closeable interface {
 		Close()
 	}
+	Reloadable interface {
+		Reload()
+	}
 
 	EngineFactory interface {
 		CreateJobEngine(config config.Engine, logger *zap.Logger) (JobEngine, error)
@@ -104,6 +107,7 @@ type (
 
 	JobManager interface {
 		Closeable
+		Reloadable
 		GetName() string
 		CreateJob(ctx context.Context, j *Job, kind string) error
 		AcceptableJob(ctx context.Context, j Job) string
@@ -116,6 +120,7 @@ type (
 
 	LogManager interface {
 		Closeable
+		Reloadable
 		GetName() string
 		StartLoop() error
 		DeleteJob(ctx context.Context, jobID JobIdentity) error
@@ -125,6 +130,7 @@ type (
 
 	JobEngine interface {
 		Closeable
+		Reloadable
 		Initialize() error
 		GetName() string
 		GetSupportedJobs() []string
@@ -138,6 +144,7 @@ type (
 
 	JobStore interface {
 		Closeable
+		Reloadable
 		Initialize() error
 		GetName() string
 		CreateJob(ctx context.Context, job *Job, ttl int64) error

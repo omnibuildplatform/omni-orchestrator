@@ -177,6 +177,16 @@ func (m *jobManagerImpl) Close() {
 	}
 }
 
+func (m *jobManagerImpl) Reload() {
+	if m.engine != nil {
+		m.engine.Reload()
+	}
+	if m.store != nil {
+		m.store.Reload()
+	}
+	m.logger.Info("job manager configuration reloaded")
+}
+
 func (m *jobManagerImpl) StartLoop() error {
 	if m.engine == nil {
 		return errors.New("task engine is empty")

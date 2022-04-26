@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 )
 
@@ -25,26 +26,9 @@ type BuildImagePackages struct {
 	Packages []string `json:"packages"`
 }
 
-type Handler struct {
-	logger     *zap.Logger
-	dataFolder string
-	namespace  string
-	name       string
-	paras      JobImageBuildFromReleasePara
-	templates  map[string][]byte
-}
-
-func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
-	f, err := os.Stat(dataFolder)
-	if err != nil {
-		return nil, err
-	}
-	if !f.IsDir() {
-		return nil, errors.New(fmt.Sprintf("path %s is not a directory", dataFolder))
-	}
-	//check necessary yaml files
+func loadTemplates(folder string) (map[string][]byte, error) {
 	templates := make(map[string][]byte)
-	err = filepath.Walk(dataFolder, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -69,16 +53,54 @@ func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Handler{
+	return templates, nil
+}
+
+type Handler struct {
+	logger     *zap.Logger
+	dataFolder string
+	namespace  string
+	name       string
+	paras      JobImageBuildFromReleasePara
+	templates  map[string][]byte
+	sync.Mutex
+}
+
+func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
+	f, err := os.Stat(dataFolder)
+	if err != nil {
+		return nil, err
+	}
+	if !f.IsDir() {
+		return nil, errors.New(fmt.Sprintf("path %s is not a directory", dataFolder))
+	}
+	//check necessary yaml files
+	handler := &Handler{
 		logger:     logger,
 		dataFolder: dataFolder,
 		paras:      JobImageBuildFromReleasePara{},
-		templates:  templates,
-	}, nil
+	}
+	handler.templates, err = loadTemplates(dataFolder)
+	if err != nil {
+		return nil, err
+	}
+	return handler, nil
 }
 
 func (h *Handler) GetJobArchitecture() string {
 	return strings.ToLower(h.paras.Architecture)
+}
+
+func (h *Handler) Reload() {
+	h.Lock()
+	defer h.Unlock()
+	templates, err := loadTemplates(h.dataFolder)
+	if err != nil {
+		h.logger.Warn(fmt.Sprintf("unable to reload template files %s", err))
+	} else {
+		h.templates = templates
+	}
+	h.logger.Info("extend job:buildimagefromrelease reloaded job templates")
 }
 func (h *Handler) Initialize(namespace, name string, parameters map[string]interface{}) error {
 	h.name = name
@@ -117,5 +139,7 @@ func (h *Handler) Initialize(namespace, name string, parameters map[string]inter
 	return nil
 }
 func (h *Handler) GetAllSerializedObjects() map[string][]byte {
+	h.Lock()
+	defer h.Unlock()
 	return h.templates
 }

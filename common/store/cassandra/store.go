@@ -107,6 +107,10 @@ func (s *Store) Close() {
 	}
 }
 
+func (s *Store) Reload() {
+	s.logger.Info("job store configuration reloaded")
+}
+
 func (s *Store) GetName() string {
 	return "cassandra"
 }

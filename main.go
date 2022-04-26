@@ -63,26 +63,49 @@ func CreateJob(c *gin.Context) {
 
 // listenSignals Graceful start/stop server
 func listenSignals() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	sigChan := make(chan os.Signal, 10)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	go handleSignals(sigChan)
 }
 
 // handleSignals handle process signal
 func handleSignals(c chan os.Signal) {
-	color.Info.Printf("Notice: System signal monitoring is enabled(watch: SIGINT,SIGTERM,SIGQUIT)\n")
-
-	switch <-c {
-	case syscall.SIGINT:
-		color.Info.Printf("\nShutdown by Ctrl+C")
-	case syscall.SIGTERM: // by kill
-		color.Info.Printf("\nShutdown quickly")
-	case syscall.SIGQUIT:
-		color.Info.Printf("\nShutdown gracefully")
-		// do graceful shutdown
+	var quit = false
+	color.Info.Printf("Notice: System signal monitoring is enabled(watch: SIGINT,SIGTERM,SIGQUIT,SIGHUP)\n")
+	for {
+		if quit {
+			break
+		}
+		select {
+		case s, ok := <-c:
+			if !ok {
+				quit = true
+				break
+			} else {
+				switch s {
+				case syscall.SIGHUP:
+					color.Info.Printf("Configuration reload\n")
+					if scheduler != nil {
+						scheduler.Reload()
+					}
+				case syscall.SIGINT:
+					color.Info.Printf("\nShutdown by Ctrl+C")
+					quit = true
+					break
+				case syscall.SIGTERM: // by kill
+					color.Info.Printf("\nShutdown quickly")
+					quit = true
+					break
+				case syscall.SIGQUIT:
+					color.Info.Printf("\nShutdown gracefully")
+					quit = true
+					break
+					// do graceful shutdown
+				}
+			}
+		}
 	}
-
 	// sync logs
 	_ = app.Logger.Sync()
 

@@ -29,15 +29,15 @@ import (
 )
 
 const (
-	ArchitectureKey           = "architecture"
-	AppLabelKey               = "omni-orchestrator"
-	AppLabelValue             = "true"
-	AnnotationService         = "omni-tag/service"
-	AnnotationDomain          = "omni-tag/domain"
-	AnnotationTask            = "omni-tag/task"
-	AnnotationArch            = "omni-tag/architecture"
-	DefaultSyncInterval       = 3
-	DefaultEventChannel       = 200
+	ArchitectureKey     = "architecture"
+	AppLabelKey         = "omni-orchestrator"
+	AppLabelValue       = "true"
+	AnnotationService   = "omni-tag/service"
+	AnnotationDomain    = "omni-tag/domain"
+	AnnotationTask      = "omni-tag/task"
+	AnnotationArch      = "omni-tag/architecture"
+	DefaultSyncInterval = 3
+	DefaultEventChannel = 200
 )
 
 type BuildImagePackages struct {
@@ -45,6 +45,7 @@ type BuildImagePackages struct {
 }
 
 type Engine struct {
+	sync.Mutex
 	logger           *zap.Logger
 	config           appconfig.Engine
 	x86clientSet     *kubernetes.Clientset
@@ -54,6 +55,7 @@ type Engine struct {
 	closeCh          chan struct{}
 	eventChannel     chan common.JobIdentity
 	JobWatchMap      sync.Map
+	JobPluginMap     map[string]plugins.JobHandler
 }
 
 func NewEngine(config appconfig.Engine, logger *zap.Logger) (common.JobEngine, error) {
@@ -103,6 +105,7 @@ func NewEngine(config appconfig.Engine, logger *zap.Logger) (common.JobEngine, e
 		closeCh:          make(chan struct{}),
 		eventChannel:     make(chan common.JobIdentity, DefaultEventChannel),
 		JobWatchMap:      sync.Map{},
+		JobPluginMap:     make(map[string]plugins.JobHandler),
 	}, nil
 }
 
@@ -154,6 +157,15 @@ func (e *Engine) Close() {
 	runtime.HandleCrash()
 	close(e.closeCh)
 	close(e.eventChannel)
+}
+
+func (e *Engine) Reload() {
+	e.Lock()
+	defer e.Unlock()
+	for _, p := range e.JobPluginMap {
+		p.Reload()
+	}
+	e.logger.Info("job engine configuration reloaded")
 }
 
 func (e *Engine) GetName() string {
@@ -239,6 +251,18 @@ func (e *Engine) GetKubernetesJobIdentity(job *common.Job, architecture string) 
 	}
 }
 
+func (e *Engine) deleteSingleResource(job *common.Job, resource interface{}) error {
+	switch resource.(type) {
+	case *batchv1.Job:
+		return e.GetClientSet(job.ExtraIdentities).BatchV1().Jobs(e.ConvertToNamespace(job.Domain)).Delete(context.TODO(), job.ID, metav1.DeleteOptions{})
+	case *v1.ConfigMap:
+		return e.GetClientSet(job.ExtraIdentities).CoreV1().ConfigMaps(e.ConvertToNamespace(job.Domain)).Delete(context.TODO(), job.ID, metav1.DeleteOptions{})
+	default:
+		e.logger.Warn(fmt.Sprintf("unsupported kubernetes resource %s", resource))
+	}
+	return nil
+}
+
 func (e *Engine) createSingleResource(job *common.Job, resource interface{}) error {
 	var err error
 	switch resource.(type) {
@@ -289,11 +313,27 @@ func (e *Engine) createSingleResource(job *common.Job, resource interface{}) err
 	return nil
 }
 
+func (e *Engine) GetJobHandler(task string) (plugins.JobHandler, error) {
+	e.Lock()
+	defer e.Unlock()
+	if v, ok := e.JobPluginMap[task]; ok {
+		return v, nil
+	} else {
+		jobHandler, err := plugins.SupportedJobPlugins[task].CreateJobHandler(path.Join(e.config.KubernetesTemplateFolder, strings.ToLower(task)), e.logger)
+		if err != nil {
+			return nil, err
+		}
+		e.JobPluginMap[task] = jobHandler
+		return jobHandler, nil
+	}
+}
+
 func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 	var err error
-	var createdResource []interface{}
+	var deleteResource = true
+	var createdResource = make(map[string]interface{})
 	//1. initialize job handler
-	jobHandler, err := plugins.SupportedJobPlugins[job.Task].CreateJobHandler(path.Join(e.config.KubernetesTemplateFolder, strings.ToLower(job.Task)), e.logger)
+	jobHandler, err := e.GetJobHandler(job.Task)
 	if err != nil {
 		return err
 	}
@@ -308,12 +348,19 @@ func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 		return err
 	}
 	//3. delete resource if failed creating
-	defer func() {
-		for _, r := range createdResource {
-			e.logger.Info(fmt.Sprintf("task creation revert, delete resource %s", r))
-			//TODO: please delete the resource
+	defer func(delete *bool) {
+		if *delete {
+			for k, r := range createdResource {
+				e.logger.Info(fmt.Sprintf("task creation revert, delete resource %s", k))
+				err := e.deleteSingleResource(job, r)
+				if err != nil {
+					e.logger.Warn(fmt.Sprintf("failed to delete kubernetes resource %s for job %s/%s", k, job.Domain, job.ID))
+				} else {
+					e.logger.Info(fmt.Sprintf("kubernetes resource %s deleted for job %s/%s", k, job.Domain, job.ID))
+				}
+			}
 		}
-	}()
+	}(&deleteResource)
 	//4. iterate yaml resource and create
 	for k, bytes := range jobHandler.GetAllSerializedObjects() {
 		decode := scheme.Codecs.UniversalDeserializer().Decode
@@ -321,14 +368,14 @@ func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 		if err != nil {
 			return syserror.New(fmt.Sprintf("unable to decode kubernetes resource %s for job %s", k, job.Task))
 		}
-		fmt.Println(rs)
 		err = e.createSingleResource(job, rs)
 		if err != nil {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("resource %s created for job %s/%s and type %s", k, job.Domain, job.ID, job.Task))
-		createdResource = append(createdResource, rs)
+		createdResource[k] = rs
 	}
+	deleteResource = false
 	return nil
 }
 

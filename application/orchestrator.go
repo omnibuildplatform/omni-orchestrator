@@ -365,6 +365,15 @@ func (r *Orchestrator) StartLoop() error {
 	return nil
 }
 
+func (r *Orchestrator) Reload() {
+	if r.logManager != nil {
+		r.logManager.Reload()
+	}
+	if r.jobManager != nil {
+		r.jobManager.Reload()
+	}
+}
+
 func (r *Orchestrator) Close() {
 	//close job first
 	if r.jobManager != nil {

@@ -23,8 +23,9 @@ manager: fmt vet swagger-doc
 	go build -ldflags "-X main.Tag=$(GIT_TAG) -X main.CommitID=$(GIT_COMMIT) -X main.ReleaseAt=$(RELEASED_AT)"  -o bin/manager main.go
 
 # Run up server
-run: fmt vet swagger-doc
-	go run ./main.go
+# NOTE(tommylike): do not use go run command for the issue of signal relay issue
+run: manager
+	./bin/manager
 
 # Generate swagger docs
 swagger-doc:
