@@ -26,7 +26,14 @@ func init() {
 	})
 	application.InitServer()
 }
+func printVersion() {
+	color.Info.Printf("============ Release Info ============:\n")
+	color.Info.Printf("Git Tag: %s\n", app.Info.Tag)
+	color.Info.Printf("Git CommitID: %s\n", app.Info.CommitID)
+	color.Info.Printf("Released At: %s\n", app.Info.ReleaseAt)
+}
 func main() {
+	printVersion()
 	listenSignals()
 	var err error
 	scheduler, err = application.NewOrchestrator(app.AppConfig, application.RouterGroup().Group("/jobs"),

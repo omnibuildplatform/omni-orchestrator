@@ -40,7 +40,7 @@ vet:
 
 # Build the docker image
 docker-build:
-	docker build . -t ${IMG} --build-arg GO_ARCHITECTURE=${ARCHITECTURE}
+	docker build . -t ${IMG} --build-arg GO_ARCHITECTURE=${ARCHITECTURE}  --build-arg GIT_TAG=${GIT_TAG}  --build-arg GIT_COMMIT=${GIT_COMMIT} --build-arg RELEASED_AT=${RELEASED_AT}
 
 # Push the docker image
 docker-push:
