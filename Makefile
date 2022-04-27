@@ -51,6 +51,7 @@ docker-push:
 cassandra:
 	./scripts/prepare-database.sh
 
-## update deploy yaml
-deploy-update:
-	cd ./deploy && kustomize edit set image ${IMG}
+## deploy yaml
+generate:
+	cp -rf resources/kubernetes_templates/* ./deploy/resources
+	cd ./deploy && kustomize edit set image ${IMG} && kustomize build .

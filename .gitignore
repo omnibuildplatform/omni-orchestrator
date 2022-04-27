@@ -22,3 +22,5 @@ vendor
 
 .idea/
 .devcontainer/
+# job templates folder, generated via makefile
+deploy/resources
