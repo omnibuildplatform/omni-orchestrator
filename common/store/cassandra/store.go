@@ -281,84 +281,85 @@ func (s *Store) getJobs(ctx context.Context, service, task, domain, date string,
 			break
 		} else {
 			job := common.Job{}
+			//job ID
+			if value, ok := (result["job_id"]).(gocql.UUID); ok {
+				job.ID = value.String()
+			} else {
+				s.logger.Error("unable to decode job ID, job will be skipped")
+				break
+			}
 			//service
 			if value, ok := (result["service"]).(string); ok {
 				job.Service = value
 			} else {
-				s.logger.Warn("unable to decode job service")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s service %s", job.ID, result))
 			}
 			//task
 			if value, ok := (result["task"]).(string); ok {
 				job.Task = value
 			} else {
-				s.logger.Warn("unable to decode job task")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s task %s", job.ID, result))
 			}
 			//domain
 			if value, ok := (result["domain"]).(string); ok {
 				job.Domain = value
 			} else {
-				s.logger.Warn("unable to decode job domain")
-			}
-			//job ID
-			if value, ok := (result["job_id"]).(gocql.UUID); ok {
-				job.ID = value.String()
-			} else {
-				s.logger.Warn("unable to decode job ID")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s domain %s", job.ID, result))
 			}
 			//user ID
 			if value, ok := (result["user_id"]).(string); ok {
 				job.UserID = value
 			} else {
-				s.logger.Warn("unable to decode job user id")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s user id %s", job.ID, result))
 			}
 			//engine
 			if value, ok := (result["engine"]).(string); ok {
 				job.Engine = value
 			} else {
-				s.logger.Warn("unable to decode job engine")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s engine %s", job.ID, result))
 			}
 			//started_time
 			if value, ok := (result["started_time"]).(time.Time); ok {
 				job.StartTime = value
 			} else {
-				s.logger.Warn("unable to decode job start time")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s start time %s", job.ID, result))
 			}
 			//finished_time
 			if value, ok := (result["finished_time"]).(time.Time); ok {
 				job.EndTime = value
 			} else {
-				s.logger.Warn("unable to decode job finish time")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s finish time %s", job.ID, result))
 			}
 			//state
 			if value, ok := (result["state"]).(string); ok {
 				job.State = common.JobState(value)
 			} else {
-				s.logger.Warn("unable to decode job state")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s state %s", job.ID, result))
 			}
 			//detail
 			if value, ok := (result["detail"]).(string); ok {
 				job.Detail = value
 			} else {
-				s.logger.Warn("unable to decode job detail")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s detail %s", job.ID, result))
 			}
 			//version
 			if value, ok := (result["version"]).(int); ok {
 				job.Version = int32(value)
 			} else {
-				s.logger.Warn("unable to decode job version")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s version %s", job.ID, result))
 			}
 			//append steps
 			stepsDB, ok := result["steps"].([]map[string]interface{})
 			if ok {
 				job.Steps = s.collectJobSteps(stepsDB)
 			} else {
-				s.logger.Warn("unable to decode job steps")
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s steps %s", job.ID, result))
 			}
 			//append specs
 			var spec map[string]interface{}
 			err := json.Unmarshal(result["spec"].([]byte), &spec)
 			if err != nil {
-				s.logger.Warn(fmt.Sprintf("unable to job spec into struct %s", err))
+				s.logger.Warn(fmt.Sprintf("unable to decode job %s spec %s", job.ID, result))
 			} else {
 				job.Spec = spec
 			}
