@@ -61,7 +61,6 @@ type Handler struct {
 	dataFolder string
 	namespace  string
 	name       string
-	paras      JobImageBuildFromReleasePara
 	templates  map[string][]byte
 	sync.Mutex
 }
@@ -78,17 +77,12 @@ func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
 	handler := &Handler{
 		logger:     logger,
 		dataFolder: dataFolder,
-		paras:      JobImageBuildFromReleasePara{},
 	}
 	handler.templates, err = loadTemplates(dataFolder)
 	if err != nil {
 		return nil, err
 	}
 	return handler, nil
-}
-
-func (h *Handler) GetJobArchitecture() string {
-	return strings.ToLower(h.paras.Architecture)
 }
 
 func (h *Handler) Reload() {
@@ -102,45 +96,46 @@ func (h *Handler) Reload() {
 	}
 	h.logger.Info("extend job:buildimagefromrelease reloaded job templates")
 }
-func (h *Handler) Serialize(namespace, name string, parameters map[string]interface{}) (map[string][]byte, error) {
+func (h *Handler) Serialize(namespace, name string, parameters map[string]interface{}) (map[string][]byte, string, error) {
 	renderedTemplates := make(map[string][]byte)
+	var paras JobImageBuildFromReleasePara
 	h.name = name
 	h.namespace = namespace
-	err := mapstructure.Decode(parameters, &h.paras)
+	err := mapstructure.Decode(parameters, &paras)
 	if err != nil {
-		return map[string][]byte{}, errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
+		return map[string][]byte{}, "", errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
 	}
-	if len(h.paras.Version) == 0 || len(h.paras.Format) == 0 || len(h.paras.Packages) == 0 || len(h.paras.Architecture) == 0 {
-		return map[string][]byte{}, errors.New("format packages, architecture or version empty")
+	if len(paras.Version) == 0 || len(paras.Format) == 0 || len(paras.Packages) == 0 || len(paras.Architecture) == 0 {
+		return map[string][]byte{}, "", errors.New("format packages, architecture or version empty")
 	}
 	// parse templates
 	wrapPackages := BuildImagePackages{
-		Packages: h.paras.Packages,
+		Packages: paras.Packages,
 	}
 	packages, err := json.Marshal(wrapPackages)
 	if err != nil {
-		return map[string][]byte{}, err
+		return map[string][]byte{}, "", err
 	}
 	variables := map[string]string{
 		"name":      h.name,
 		"namespace": h.namespace,
-		"version":   h.paras.Version,
+		"version":   paras.Version,
 		"packages":  string(packages),
-		"format":    h.paras.Format,
+		"format":    paras.Format,
 	}
 	h.Lock()
 	defer h.Unlock()
 	for k, value := range h.templates {
 		resourceTemplate, err := template.New(k).Parse(string(value))
 		if err != nil {
-			return map[string][]byte{}, err
+			return map[string][]byte{}, "", err
 		}
 		buffer := new(bytes.Buffer)
 		err = resourceTemplate.ExecuteTemplate(buffer, k, variables)
 		if err != nil {
-			return map[string][]byte{}, err
+			return map[string][]byte{}, "", err
 		}
 		renderedTemplates[k] = buffer.Bytes()
 	}
-	return renderedTemplates, nil
+	return renderedTemplates, strings.ToLower(paras.Architecture), nil
 }

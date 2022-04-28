@@ -337,11 +337,11 @@ func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 	if err != nil {
 		return err
 	}
-	templates, err := jobHandler.Serialize(e.ConvertToNamespace(job.Domain), job.ID, job.Spec)
+	templates, architecture, err := jobHandler.Serialize(e.ConvertToNamespace(job.Domain), job.ID, job.Spec)
 	if err != nil {
 		return err
 	}
-	jobId := e.GetKubernetesJobIdentity(job, jobHandler.GetJobArchitecture())
+	jobId := e.GetKubernetesJobIdentity(job, architecture)
 	//2. prepare namespace
 	err = e.CreateNamespaceIfNeeded(&jobId)
 	if err != nil {

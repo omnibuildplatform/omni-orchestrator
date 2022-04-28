@@ -11,7 +11,6 @@ type (
 
 	JobHandler interface {
 		Reload()
-		GetJobArchitecture() string
-		Serialize(namespace, name string, parameters map[string]interface{}) (map[string][]byte, error)
+		Serialize(namespace, name string, parameters map[string]interface{}) (map[string][]byte, string, error)
 	}
 )

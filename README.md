@@ -22,7 +22,7 @@
 1. **cassandra**: cassandra的环境准备已经集成到Makefile，可以通过`make cassandra`快速拉起一个docker环境下的cassandra实例，程序会等待cassandra连接就绪，并完成实例的本地端口(9042)映射与数据表的初始化，也就是说，命令完成后，可以在本机通过`cqlsh`连接数据库。
 2. **kubernetes**: 服务通过配置的kubeconfig文件与kubernetes通信，并管理kubernetes上面的任务资源，具体在配置文件中的`engine.x86ConfigFile`与`engine.aarch64ConfigFile`, 服务启动前需要修改`config/dev.app.toml`文件，确保kubernetes正确连接。
 
-准备完成后，执行`make run`,便可以正常拉起服务，通过访问 `http://127.0.0.1:8080/v1/swagger/index.html` 可以查看具体的API文档。
+准备完成后，执行`make run`,便可以正常拉起服务，通过访问 `http://127.0.0.1:8080/v1/swagger/index.html` 查看具体的API文档。
 
 # 服务部署
 部署Yaml归档在`deploy`目录，服务所依赖的所有kubernetes资源都包含在内，基于实际的部署场景，需要优先修改ingress domain&secret，pvc storage class, database version等信息, 可以通过命令`make generate`更新yaml信息，并生成最终的yaml
@@ -57,7 +57,17 @@ PRIMARY KEY  ((service, task), domain, job_id, step_id, log_time)
 
 ## 任务扩展
 整个构建平台涉及多种具体任务的开发，如ISO构建，RPM构建，SRPM打包，考虑到每种任务的规格，参数，以及Worker版本都需要灵活配置，为满足快速开发和更新的需求，
-任务的通用部分放在了核心的逻辑里面，具体的任务可通过插件+模板的方式快速开发，服务本身也支持SIGHUP重载模板文件，确保更新的有效及服务不中断，以ISO构建举例, 任务需要的资源都通过go template的模式单独配置:
+任务的通用部分放在了核心的逻辑里面，具体的任务可通过插件+模板的方式快速开发，服务本身也支持SIGHUP重载模板文件，确保更新的有效及服务不中断，每个扩展的任务需要实现2个函数，
+```go
+type JobHandler interface {
+	//reload templates
+    Reload()
+    //generate serialized kubernetes yaml bytes
+    Serialize(namespace, name string, parameters map[string]interface{}) (map[string][]byte, string, error)
+}
+```
+
+以ISO构建举例, 任务需要的资源都通过go template的模式单独配置:
 ```shell
 ➜  kubernetes_templates: tree -L 2
 .
