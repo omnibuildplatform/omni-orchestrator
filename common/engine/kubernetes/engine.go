@@ -337,7 +337,7 @@ func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 	if err != nil {
 		return err
 	}
-	err = jobHandler.Initialize(e.ConvertToNamespace(job.Domain), job.ID, job.Spec)
+	templates, err := jobHandler.Serialize(e.ConvertToNamespace(job.Domain), job.ID, job.Spec)
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 		}
 	}(&deleteResource)
 	//4. iterate yaml resource and create
-	for k, bytes := range jobHandler.GetAllSerializedObjects() {
+	for k, bytes := range templates {
 		decode := scheme.Codecs.UniversalDeserializer().Decode
 		rs, _, err := decode(bytes, nil, nil)
 		if err != nil {

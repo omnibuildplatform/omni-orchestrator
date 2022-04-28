@@ -102,12 +102,16 @@ func (h *Handler) Reload() {
 	}
 	h.logger.Info("extend job:buildimagefromrelease reloaded job templates")
 }
-func (h *Handler) Initialize(namespace, name string, parameters map[string]interface{}) error {
+func (h *Handler) Serialize(namespace, name string, parameters map[string]interface{}) (map[string][]byte, error) {
+	renderedTemplates := make(map[string][]byte)
 	h.name = name
 	h.namespace = namespace
 	err := mapstructure.Decode(parameters, &h.paras)
 	if err != nil {
-		return errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
+		return map[string][]byte{}, errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
+	}
+	if len(h.paras.Version) == 0 || len(h.paras.Format) == 0 || len(h.paras.Packages) == 0 || len(h.paras.Architecture) == 0 {
+		return map[string][]byte{}, errors.New("format packages, architecture or version empty")
 	}
 	// parse templates
 	wrapPackages := BuildImagePackages{
@@ -115,7 +119,7 @@ func (h *Handler) Initialize(namespace, name string, parameters map[string]inter
 	}
 	packages, err := json.Marshal(wrapPackages)
 	if err != nil {
-		return err
+		return map[string][]byte{}, err
 	}
 	variables := map[string]string{
 		"name":      h.name,
@@ -124,22 +128,19 @@ func (h *Handler) Initialize(namespace, name string, parameters map[string]inter
 		"packages":  string(packages),
 		"format":    h.paras.Format,
 	}
+	h.Lock()
+	defer h.Unlock()
 	for k, value := range h.templates {
 		resourceTemplate, err := template.New(k).Parse(string(value))
 		if err != nil {
-			return err
+			return map[string][]byte{}, err
 		}
 		buffer := new(bytes.Buffer)
 		err = resourceTemplate.ExecuteTemplate(buffer, k, variables)
 		if err != nil {
-			return err
+			return map[string][]byte{}, err
 		}
-		h.templates[k] = buffer.Bytes()
+		renderedTemplates[k] = buffer.Bytes()
 	}
-	return nil
-}
-func (h *Handler) GetAllSerializedObjects() map[string][]byte {
-	h.Lock()
-	defer h.Unlock()
-	return h.templates
+	return renderedTemplates, nil
 }
