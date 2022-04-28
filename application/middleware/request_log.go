@@ -15,7 +15,7 @@ import (
 func RequestLog() gin.HandlerFunc {
 	//skip success healthiness and readiness check endpoints
 	skip := map[string]int{
-		"/health": 200,
+		"/v1/health": 200,
 	}
 
 	return func(c *gin.Context) {

@@ -1,0 +1,157 @@
+{"level":"info","ts":"2022-04-28T20:04:25.927+0800","caller":"app/logger.go:16","msg":"logger construction succeeded"}
+{"level":"info","ts":"2022-04-28T20:04:26.358+0800","caller":"kubernetes/engine.go:118","msg":"x86 kubernetes connected v1.19.10-r1.0.0-source-119-g112eab5b37dfc3"}
+{"level":"info","ts":"2022-04-28T20:04:27.090+0800","caller":"kubernetes/engine.go:125","msg":"aarch64 kubernetes connected v1.15.6-r1-CCE2.0.30.B001"}
+{"level":"info","ts":"2022-04-28T20:04:27.194+0800","caller":"common/log_manager.go:106","msg":"starting to initialzie 5 log manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:04:27.194+0800","caller":"common/log_manager.go:111","msg":"log manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:04:27.194+0800","caller":"common/job_manager.go:200","msg":"starting to initialzie 3 job manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:04:27.395+0800","caller":"kubernetes/engine.go:716","msg":"x86 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:04:27.596+0800","caller":"kubernetes/engine.go:766","msg":"aarch64 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:04:27.596+0800","caller":"common/job_manager.go:209","msg":"job manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"cassandra/store.go:105","msg":"job store will quit"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"application/orchestrator.go:382","msg":"job manager closed."}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"application/orchestrator.go:386","msg":"log manager closed."}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 2 will quit"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 5 will quit"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"common/log_manager.go:124","msg":"channel closed log step status checker will quit"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 1 will quit"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"common/job_manager.go:220","msg":"channel closed request reducer will quite"}
+{"level":"info","ts":"2022-04-28T20:04:59.112+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 1 will quite"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 3 will quit"}
+{"level":"info","ts":"2022-04-28T20:04:59.112+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 2 will quite"}
+{"level":"info","ts":"2022-04-28T20:04:59.111+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 4 will quit"}
+{"level":"info","ts":"2022-04-28T20:04:59.112+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 3 will quite"}
+2022-04-28T20:05:12.750+0800	info	app/logger.go:16	logger construction succeeded
+2022-04-28T20:05:13.338+0800	info	kubernetes/engine.go:118	x86 kubernetes connected v1.19.10-r1.0.0-source-119-g112eab5b37dfc3
+2022-04-28T20:05:13.923+0800	info	kubernetes/engine.go:125	aarch64 kubernetes connected v1.15.6-r1-CCE2.0.30.B001
+2022-04-28T20:05:14.013+0800	info	common/log_manager.go:106	starting to initialzie 5 log manager worker(s) to sync job status.
+2022-04-28T20:05:14.013+0800	info	common/log_manager.go:111	log manager fully starts
+2022-04-28T20:05:14.013+0800	info	common/job_manager.go:200	starting to initialzie 3 job manager worker(s) to sync job status.
+2022-04-28T20:05:14.315+0800	info	kubernetes/engine.go:716	x86 kubernetes engine loop started
+2022-04-28T20:05:14.516+0800	info	kubernetes/engine.go:766	aarch64 kubernetes engine loop started
+2022-04-28T20:05:14.516+0800	info	common/job_manager.go:209	job manager fully starts
+2022-04-28T20:05:50.048+0800	info	kubernetes/engine.go:152	namespace default already exists in kubernetes
+2022-04-28T20:05:50.359+0800	info	kubernetes/engine.go:375	resource configmap.yaml created for job default/8b53b2d2-c6eb-11ec-8721-acde48001122 and type buildimagefromrelease
+2022-04-28T20:05:50.682+0800	info	kubernetes/engine.go:576	job default/8b53b2d2-c6eb-11ec-8721-acde48001122 triggered once
+2022-04-28T20:05:50.690+0800	info	kubernetes/engine.go:375	resource job.yaml created for job default/8b53b2d2-c6eb-11ec-8721-acde48001122 and type buildimagefromrelease
+2022-04-28T20:05:50.731+0800	info	kubernetes/engine.go:600	job's pod default/8b53b2d2-c6eb-11ec-8721-acde48001122 has been updated
+2022-04-28T20:05:50.738+0800	info	kubernetes/engine.go:586	job default/8b53b2d2-c6eb-11ec-8721-acde48001122 has been updated
+2022-04-28T20:05:50.754+0800	info	kubernetes/engine.go:600	job's pod default/8b53b2d2-c6eb-11ec-8721-acde48001122 has been updated
+2022-04-28T20:05:51.931+0800	info	kubernetes/engine.go:600	job's pod default/8b53b2d2-c6eb-11ec-8721-acde48001122 has been updated
+2022-04-28T20:05:52.014+0800	info	common/job_manager.go:246	worker 1 received job default/8b53b2d2-c6eb-11ec-8721-acde48001122 change event
+2022-04-28T20:05:56.136+0800	info	kubernetes/engine.go:600	job's pod default/8b53b2d2-c6eb-11ec-8721-acde48001122 has been updated
+2022-04-28T20:05:58.017+0800	info	common/job_manager.go:246	worker 2 received job default/8b53b2d2-c6eb-11ec-8721-acde48001122 change event
+2022-04-28T20:05:58.718+0800	info	common/log_manager.go:175	job step 8b53b2d2-c6eb-11ec-8721-acde48001122/1 log will be cleared.
+2022-04-28T20:05:58.736+0800	info	common/log_manager.go:248	collect job step 8b53b2d2-c6eb-11ec-8721-acde48001122/1 log finished
+2022-04-28T20:05:58.758+0800	info	common/log_manager.go:208	job: 8b53b2d2-c6eb-11ec-8721-acde48001122/rootfs-download 1107 log data saved into log store
+2022-04-28T20:05:58.801+0800	info	common/log_manager.go:208	job: 8b53b2d2-c6eb-11ec-8721-acde48001122/rootfs-download 36 log data saved into log store
+2022-04-28T20:05:59.190+0800	info	kubernetes/engine.go:600	job's pod default/8b53b2d2-c6eb-11ec-8721-acde48001122 has been updated
+2022-04-28T20:06:00.014+0800	info	common/job_manager.go:246	worker 3 received job default/8b53b2d2-c6eb-11ec-8721-acde48001122 change event
+2022-04-28T20:06:00.184+0800	info	kubernetes/engine.go:600	job's pod default/8b53b2d2-c6eb-11ec-8721-acde48001122 has been updated
+2022-04-28T20:06:00.784+0800	info	common/log_manager.go:175	job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log will be cleared.
+2022-04-28T20:06:02.014+0800	info	common/job_manager.go:246	worker 1 received job default/8b53b2d2-c6eb-11ec-8721-acde48001122 change event
+2022-04-28T20:06:19.904+0800	info	cassandra/store.go:105	job store will quit
+2022-04-28T20:06:19.904+0800	info	common/job_manager.go:220	channel closed request reducer will quite
+2022-04-28T20:06:19.905+0800	info	common/job_manager.go:243	channel closed: job sync worker 2 will quite
+2022-04-28T20:06:19.905+0800	info	common/job_manager.go:243	channel closed: job sync worker 1 will quite
+2022-04-28T20:06:19.905+0800	info	common/job_manager.go:243	channel closed: job sync worker 3 will quite
+2022-04-28T20:06:19.905+0800	info	application/orchestrator.go:382	job manager closed.
+2022-04-28T20:06:19.905+0800	info	application/orchestrator.go:386	log manager closed.
+2022-04-28T20:06:19.905+0800	info	common/log_manager.go:124	channel closed log step status checker will quit
+2022-04-28T20:06:19.905+0800	info	common/log_manager.go:248	collect job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log finished
+2022-04-28T20:06:19.905+0800	info	common/log_manager.go:157	channel closed: log sync worker 4 will quit
+2022-04-28T20:06:19.905+0800	info	common/log_manager.go:157	channel closed: log sync worker 5 will quit
+2022-04-28T20:06:19.905+0800	info	common/log_manager.go:157	channel closed: log sync worker 2 will quit
+2022-04-28T20:06:19.905+0800	info	common/log_manager.go:157	channel closed: log sync worker 3 will quit
+2022-04-28T20:06:19.906+0800	info	common/log_manager.go:157	channel closed: log sync worker 1 will quit
+2022-04-28T20:06:19.906+0800	error	common/log_manager.go:206	failed to insert job log into job store: session has been closed
+github.com/omnibuildplatform/omni-orchestrator/common.(*logManagerImpl).InsertLogPart
+	/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/common/log_manager.go:206
+{"level":"info","ts":"2022-04-28T20:12:12.331+0800","caller":"app/logger.go:16","msg":"logger construction succeeded"}
+{"level":"info","ts":"2022-04-28T20:12:12.784+0800","caller":"kubernetes/engine.go:118","msg":"x86 kubernetes connected v1.19.10-r1.0.0-source-119-g112eab5b37dfc3"}
+{"level":"info","ts":"2022-04-28T20:12:13.529+0800","caller":"kubernetes/engine.go:125","msg":"aarch64 kubernetes connected v1.15.6-r1-CCE2.0.30.B001"}
+{"level":"info","ts":"2022-04-28T20:12:13.635+0800","caller":"common/log_manager.go:106","msg":"starting to initialzie 5 log manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:12:13.635+0800","caller":"common/log_manager.go:111","msg":"log manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:12:13.635+0800","caller":"common/job_manager.go:200","msg":"starting to initialzie 3 job manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:12:13.771+0800","caller":"kubernetes/engine.go:576","msg":"job default/8b53b2d2-c6eb-11ec-8721-acde48001122 triggered once"}
+{"level":"info","ts":"2022-04-28T20:12:13.937+0800","caller":"kubernetes/engine.go:716","msg":"x86 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:12:14.138+0800","caller":"kubernetes/engine.go:766","msg":"aarch64 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:12:14.138+0800","caller":"common/job_manager.go:209","msg":"job manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:12:15.639+0800","caller":"common/job_manager.go:246","msg":"worker 1 received job default/8b53b2d2-c6eb-11ec-8721-acde48001122 change event"}
+{"level":"info","ts":"2022-04-28T20:12:16.212+0800","caller":"common/log_manager.go:175","msg":"job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log will be cleared."}
+{"level":"info","ts":"2022-04-28T20:12:26.260+0800","caller":"common/log_manager.go:208","msg":"job: 8b53b2d2-c6eb-11ec-8721-acde48001122/image-build 162424 log data saved into log store"}
+{"level":"info","ts":"2022-04-28T20:12:28.900+0800","caller":"cassandra/store.go:105","msg":"job store will quit"}
+{"level":"info","ts":"2022-04-28T20:12:28.900+0800","caller":"common/job_manager.go:220","msg":"channel closed request reducer will quite"}
+{"level":"info","ts":"2022-04-28T20:12:28.900+0800","caller":"application/orchestrator.go:382","msg":"job manager closed."}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"application/orchestrator.go:386","msg":"log manager closed."}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:248","msg":"collect job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log finished"}
+{"level":"info","ts":"2022-04-28T20:12:28.900+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 2 will quite"}
+{"level":"info","ts":"2022-04-28T20:12:28.900+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 1 will quite"}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 1 will quit"}
+{"level":"info","ts":"2022-04-28T20:12:28.900+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 3 will quite"}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 4 will quit"}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 5 will quit"}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:124","msg":"channel closed log step status checker will quit"}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 3 will quit"}
+{"level":"info","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 2 will quit"}
+{"level":"error","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:206","msg":"failed to insert job log into job store: session has been closed","stacktrace":"github.com/omnibuildplatform/omni-orchestrator/common.(*logManagerImpl).InsertLogPart\n\t/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/common/log_manager.go:206"}
+{"level":"error","ts":"2022-04-28T20:12:28.901+0800","caller":"common/log_manager.go:206","msg":"failed to insert job log into job store: session has been closed","stacktrace":"github.com/omnibuildplatform/omni-orchestrator/common.(*logManagerImpl).InsertLogPart\n\t/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/common/log_manager.go:206"}
+{"level":"info","ts":"2022-04-28T20:12:46.541+0800","caller":"app/logger.go:16","msg":"logger construction succeeded"}
+{"level":"info","ts":"2022-04-28T20:12:47.234+0800","caller":"kubernetes/engine.go:118","msg":"x86 kubernetes connected v1.19.10-r1.0.0-source-119-g112eab5b37dfc3"}
+{"level":"info","ts":"2022-04-28T20:12:47.810+0800","caller":"kubernetes/engine.go:125","msg":"aarch64 kubernetes connected v1.15.6-r1-CCE2.0.30.B001"}
+{"level":"info","ts":"2022-04-28T20:12:47.904+0800","caller":"common/log_manager.go:106","msg":"starting to initialzie 5 log manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:12:47.905+0800","caller":"common/log_manager.go:111","msg":"log manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:12:47.905+0800","caller":"common/job_manager.go:200","msg":"starting to initialzie 3 job manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:12:48.083+0800","caller":"kubernetes/engine.go:576","msg":"job default/8b53b2d2-c6eb-11ec-8721-acde48001122 triggered once"}
+{"level":"info","ts":"2022-04-28T20:12:48.306+0800","caller":"kubernetes/engine.go:716","msg":"x86 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:12:48.508+0800","caller":"kubernetes/engine.go:766","msg":"aarch64 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:12:48.508+0800","caller":"common/job_manager.go:209","msg":"job manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:12:49.905+0800","caller":"common/job_manager.go:246","msg":"worker 1 received job default/8b53b2d2-c6eb-11ec-8721-acde48001122 change event"}
+{"level":"info","ts":"2022-04-28T20:12:50.616+0800","caller":"common/log_manager.go:175","msg":"job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log will be cleared."}
+{"level":"info","ts":"2022-04-28T20:13:00.744+0800","caller":"common/log_manager.go:208","msg":"job: 8b53b2d2-c6eb-11ec-8721-acde48001122/image-build 185777 log data saved into log store"}
+{"level":"info","ts":"2022-04-28T20:13:10.731+0800","caller":"common/log_manager.go:208","msg":"job: 8b53b2d2-c6eb-11ec-8721-acde48001122/image-build 36827 log data saved into log store"}
+{"level":"info","ts":"2022-04-28T20:13:21.094+0800","caller":"common/log_manager.go:208","msg":"job: 8b53b2d2-c6eb-11ec-8721-acde48001122/image-build 37481 log data saved into log store"}
+{"level":"info","ts":"2022-04-28T20:13:30.779+0800","caller":"common/log_manager.go:208","msg":"job: 8b53b2d2-c6eb-11ec-8721-acde48001122/image-build 97977 log data saved into log store"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"cassandra/store.go:105","msg":"job store will quit"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/job_manager.go:220","msg":"channel closed request reducer will quite"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 1 will quite"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 2 will quite"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 3 will quite"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"application/orchestrator.go:382","msg":"job manager closed."}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"application/orchestrator.go:386","msg":"log manager closed."}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 1 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 5 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 4 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/log_manager.go:248","msg":"collect job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log finished"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 3 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:31.498+0800","caller":"common/log_manager.go:124","msg":"channel closed log step status checker will quit"}
+{"level":"info","ts":"2022-04-28T20:13:31.499+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 2 will quit"}
+{"level":"error","ts":"2022-04-28T20:13:31.499+0800","caller":"common/log_manager.go:206","msg":"failed to insert job log into job store: session has been closed","stacktrace":"github.com/omnibuildplatform/omni-orchestrator/common.(*logManagerImpl).InsertLogPart\n\t/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/common/log_manager.go:206"}
+{"level":"error","ts":"2022-04-28T20:13:31.499+0800","caller":"common/log_manager.go:206","msg":"failed to insert job log into job store: session has been closed","stacktrace":"github.com/omnibuildplatform/omni-orchestrator/common.(*logManagerImpl).InsertLogPart\n\t/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/common/log_manager.go:206"}
+{"level":"info","ts":"2022-04-28T20:13:42.932+0800","caller":"app/logger.go:16","msg":"logger construction succeeded"}
+{"level":"info","ts":"2022-04-28T20:13:43.521+0800","caller":"kubernetes/engine.go:118","msg":"x86 kubernetes connected v1.19.10-r1.0.0-source-119-g112eab5b37dfc3"}
+{"level":"info","ts":"2022-04-28T20:13:44.258+0800","caller":"kubernetes/engine.go:125","msg":"aarch64 kubernetes connected v1.15.6-r1-CCE2.0.30.B001"}
+{"level":"info","ts":"2022-04-28T20:13:44.364+0800","caller":"common/log_manager.go:106","msg":"starting to initialzie 5 log manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:13:44.364+0800","caller":"common/log_manager.go:111","msg":"log manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:13:44.364+0800","caller":"common/job_manager.go:200","msg":"starting to initialzie 3 job manager worker(s) to sync job status."}
+{"level":"info","ts":"2022-04-28T20:13:44.542+0800","caller":"kubernetes/engine.go:576","msg":"job default/8b53b2d2-c6eb-11ec-8721-acde48001122 triggered once"}
+{"level":"info","ts":"2022-04-28T20:13:44.765+0800","caller":"kubernetes/engine.go:716","msg":"x86 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:13:44.966+0800","caller":"kubernetes/engine.go:766","msg":"aarch64 kubernetes engine loop started"}
+{"level":"info","ts":"2022-04-28T20:13:44.966+0800","caller":"common/job_manager.go:209","msg":"job manager fully starts"}
+{"level":"info","ts":"2022-04-28T20:13:46.366+0800","caller":"common/job_manager.go:246","msg":"worker 1 received job default/8b53b2d2-c6eb-11ec-8721-acde48001122 change event"}
+{"level":"info","ts":"2022-04-28T20:13:47.100+0800","caller":"common/log_manager.go:175","msg":"job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log will be cleared."}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"cassandra/store.go:105","msg":"job store will quit"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/job_manager.go:220","msg":"channel closed request reducer will quite"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"application/orchestrator.go:382","msg":"job manager closed."}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"application/orchestrator.go:386","msg":"log manager closed."}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/log_manager.go:124","msg":"channel closed log step status checker will quit"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 5 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 2 will quite"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 4 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 3 will quite"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 1 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/job_manager.go:243","msg":"channel closed: job sync worker 1 will quite"}
+{"level":"info","ts":"2022-04-28T20:13:59.355+0800","caller":"common/log_manager.go:248","msg":"collect job step 8b53b2d2-c6eb-11ec-8721-acde48001122/2 log finished"}
+{"level":"info","ts":"2022-04-28T20:13:59.356+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 3 will quit"}
+{"level":"info","ts":"2022-04-28T20:13:59.356+0800","caller":"common/log_manager.go:157","msg":"channel closed: log sync worker 2 will quit"}
+{"level":"error","ts":"2022-04-28T20:13:59.356+0800","caller":"common/log_manager.go:206","msg":"failed to insert job log into job store: session has been closed","stacktrace":"github.com/omnibuildplatform/omni-orchestrator/common.(*logManagerImpl).InsertLogPart\n\t/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/common/log_manager.go:206"}
+{"level":"error","ts":"2022-04-28T20:13:59.356+0800","caller":"common/log_manager.go:206","msg":"failed to insert job log into job store: session has been closed","stacktrace":"github.com/omnibuildplatform/omni-orchestrator/common.(*logManagerImpl).InsertLogPart\n\t/Users/tommylike/Work/go/src/github.com/omnibuildplatform/omni-orchestrator/common/log_manager.go:206"}

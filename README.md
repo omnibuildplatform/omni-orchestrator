@@ -96,7 +96,9 @@ metadata:
   name: {{ index . "name" }}
   namespace: {{ index . "namespace" }}
 ```
-## 水平扩展
 
 ## 日志收集
 当前任务收集依赖于kubernetes API的能力，核心是`kubectl log`指令的复用，在多任务同时执行的时候，会存在性能瓶颈，后续需要将这部分功能整体迁移至worker(pod)本身。
+
+## 水平扩展
+任务的状态信息同步及日志收集均依赖后台goroutine，即使后续迁移日志收集逻辑到worker本身，`Orchestrator`本身也存在单点故障和性能瓶颈，因此我们需要考虑服务的多节点支持。
