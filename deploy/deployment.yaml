@@ -44,7 +44,7 @@ spec:
               protocol: TCP
           env:
             - name: APP_ENV
-              value: dev
+              value: prod
           volumeMounts:
             - mountPath: /app/config/app.toml
               name: config-volume

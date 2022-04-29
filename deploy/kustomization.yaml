@@ -22,4 +22,4 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: opensourceway/omni-orchestrator
-  newTag: 940acf59c96447715dbe4bcd5bbffad33ce991ec
+  newTag: cae48c8096f236f600f40941c929dc3a34f62c46
