@@ -50,20 +50,16 @@ spec:
               name: config-volume
               subPath: app.toml
             # used for job templates, update this when template files add or removed
-            - mountPath: /app/config/templates/buildimagefromrelease/configmap.yaml
-              name: job-templates-volume
-              subPath: buildimagefromrelease-configmap.yaml
-            - mountPath: /app/config/templates/buildimagefromrelease/job.yaml
-              name: job-templates-volume
-              subPath: buildimagefromrelease-job.yaml
+            - mountPath: /app/config/templates/buildimagefromrelease/
+              name: job-templates-volume-buildimagefromrelease
       serviceAccountName: omni-orchestrator
       volumes:
         - name: config-volume
           configMap:
             name: omni-orchestrator-config
-        - name: job-templates-volume
+        - name: job-templates-volume-buildimagefromrelease
           configMap:
-            name: omni-orchestrator-templates
+            name: omni-orchestrator-templates-buildimagefromrelease
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -35,7 +35,6 @@ func RequestLog() gin.HandlerFunc {
 			buf, _ := ioutil.ReadAll(c.Request.Body)
 			postData = string(buf)
 		}
-
 		if status_code, ok := skip[path]; ok {
 			if status_code == c.Writer.Status() {
 				return

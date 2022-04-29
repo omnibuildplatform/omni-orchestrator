@@ -12,9 +12,9 @@ commonLabels:
 # used for job templates, update this when template files add or removed
 configMapGenerator:
 - files:
-  - buildimagefromrelease-configmap.yaml=resources/buildimagefromrelease/configmap.yaml
-  - buildimagefromrelease-job.yaml=resources/buildimagefromrelease/job.yaml
-  name: omni-orchestrator-templates
+  - configmap.yaml=resources/buildimagefromrelease/configmap.yaml
+  - job.yaml=resources/buildimagefromrelease/job.yaml
+  name: omni-orchestrator-templates-buildimagefromrelease
 commonAnnotations:
   email: tommylikehu@gmail.com
 namespace: omni-orchestrator
@@ -22,4 +22,4 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: opensourceway/omni-orchestrator
-  newTag: 0301eaddaa2c333aed4c13b5a1001b84935d496e
+  newTag: 940acf59c96447715dbe4bcd5bbffad33ce991ec
