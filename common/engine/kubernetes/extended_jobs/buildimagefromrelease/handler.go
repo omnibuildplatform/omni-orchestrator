@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs"
+	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/plugins"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"os"
@@ -26,8 +28,8 @@ type BuildImagePackages struct {
 	Packages []string `json:"packages"`
 }
 
-func loadTemplates(folder string) (map[string][]byte, error) {
-	templates := make(map[string][]byte)
+func loadTemplates(folder string) (map[plugins.KubernetesResource][]byte, error) {
+	templates := make(map[plugins.KubernetesResource][]byte)
 	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -46,7 +48,7 @@ func loadTemplates(folder string) (map[string][]byte, error) {
 			if err != nil {
 				return err
 			}
-			templates[info.Name()] = bytes
+			templates[extended_jobs.GetResourceType(info.Name())] = bytes
 		}
 		return nil
 	})
@@ -61,7 +63,7 @@ type Handler struct {
 	dataFolder string
 	namespace  string
 	name       string
-	templates  map[string][]byte
+	templates  map[plugins.KubernetesResource][]byte
 	sync.Mutex
 }
 
@@ -96,17 +98,17 @@ func (h *Handler) Reload() {
 	}
 	h.logger.Info("extend job:buildimagefromrelease reloaded job templates")
 }
-func (h *Handler) Serialize(namespace, name string, parameters map[string]interface{}) (map[string][]byte, string, error) {
-	renderedTemplates := make(map[string][]byte)
+func (h *Handler) Serialize(namespace, name string, parameters map[string]interface{}) (map[plugins.KubernetesResource][]byte, string, error) {
+	renderedTemplates := make(map[plugins.KubernetesResource][]byte)
 	var paras JobImageBuildFromReleasePara
 	h.name = name
 	h.namespace = namespace
 	err := mapstructure.Decode(parameters, &paras)
 	if err != nil {
-		return map[string][]byte{}, "", errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
+		return map[plugins.KubernetesResource][]byte{}, "", errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
 	}
 	if len(paras.Version) == 0 || len(paras.Format) == 0 || len(paras.Packages) == 0 || len(paras.Architecture) == 0 {
-		return map[string][]byte{}, "", errors.New("format packages, architecture or version empty")
+		return map[plugins.KubernetesResource][]byte{}, "", errors.New("format packages, architecture or version empty")
 	}
 	// parse templates
 	wrapPackages := BuildImagePackages{
@@ -114,7 +116,7 @@ func (h *Handler) Serialize(namespace, name string, parameters map[string]interf
 	}
 	packages, err := json.Marshal(wrapPackages)
 	if err != nil {
-		return map[string][]byte{}, "", err
+		return map[plugins.KubernetesResource][]byte{}, "", err
 	}
 	variables := map[string]string{
 		"name":      h.name,
@@ -126,14 +128,14 @@ func (h *Handler) Serialize(namespace, name string, parameters map[string]interf
 	h.Lock()
 	defer h.Unlock()
 	for k, value := range h.templates {
-		resourceTemplate, err := template.New(k).Parse(string(value))
+		resourceTemplate, err := template.New(string(k)).Parse(string(value))
 		if err != nil {
-			return map[string][]byte{}, "", err
+			return map[plugins.KubernetesResource][]byte{}, "", err
 		}
 		buffer := new(bytes.Buffer)
-		err = resourceTemplate.ExecuteTemplate(buffer, k, variables)
+		err = resourceTemplate.ExecuteTemplate(buffer, string(k), variables)
 		if err != nil {
-			return map[string][]byte{}, "", err
+			return map[plugins.KubernetesResource][]byte{}, "", err
 		}
 		renderedTemplates[k] = buffer.Bytes()
 	}

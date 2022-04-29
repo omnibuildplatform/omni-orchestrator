@@ -331,13 +331,18 @@ func (e *Engine) GetJobHandler(task string) (plugins.JobHandler, error) {
 func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 	var err error
 	var deleteResource = true
-	var createdResource = make(map[string]interface{})
+	var createdResource = make(map[plugins.KubernetesResource]interface{})
 	//1. initialize job handler
 	jobHandler, err := e.GetJobHandler(job.Task)
 	if err != nil {
 		return err
 	}
 	templates, architecture, err := jobHandler.Serialize(e.ConvertToNamespace(job.Domain), job.ID, job.Spec)
+	for k, v := range templates {
+		if k == plugins.ResUnSupported {
+			return syserror.New(fmt.Sprintf("%s resource is unsupported, please update the available resource type", v))
+		}
+	}
 	if err != nil {
 		return err
 	}
