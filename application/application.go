@@ -28,9 +28,7 @@ func RouterGroup() *gin.RouterGroup {
 
 func InitServer() {
 	server = gin.New()
-	if app.EnvName == app.EnvDev {
-		server.Use(gin.Logger(), gin.Recovery())
-	}
+	server.Use(gin.Logger(), gin.Recovery())
 	//base url
 	docs.SwaggerInfo.BasePath = BASE_PATH
 	routerGroup = server.Group(BASE_PATH)

@@ -111,6 +111,10 @@ func (s *Store) Reload() {
 	s.logger.Info("job store configuration reloaded")
 }
 
+func (s *Store) GetReloadDirs() []string {
+	return []string{}
+}
+
 func (s *Store) GetName() string {
 	return "cassandra"
 }

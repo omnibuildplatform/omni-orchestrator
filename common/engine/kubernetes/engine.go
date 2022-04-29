@@ -22,7 +22,9 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -166,6 +168,26 @@ func (e *Engine) Reload() {
 		p.Reload()
 	}
 	e.logger.Info("job engine configuration reloaded")
+}
+
+func (e *Engine) GetReloadDirs() []string {
+	var dirs []string
+	err := filepath.Walk(e.config.KubernetesTemplateFolder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if strings.TrimRight(e.config.KubernetesTemplateFolder, "/") != path {
+				dirs = append(dirs, path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		e.logger.Error(fmt.Sprintf("unable to collect extend job templates folders %v", err))
+		return []string{}
+	}
+	return dirs
 }
 
 func (e *Engine) GetName() string {

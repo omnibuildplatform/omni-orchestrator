@@ -96,6 +96,17 @@ func (l *logManagerImpl) Reload() {
 	l.logger.Info("job manager configuration reloaded")
 }
 
+func (l *logManagerImpl) GetReloadDirs() []string {
+	var dirs []string
+	if l.engine != nil {
+		dirs = append(dirs, l.engine.GetReloadDirs()...)
+	}
+	if l.store != nil {
+		dirs = append(dirs, l.store.GetReloadDirs()...)
+	}
+	return dirs
+}
+
 func (l *logManagerImpl) GetName() string {
 	return "log-manager"
 }
