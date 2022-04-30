@@ -2,12 +2,12 @@ package application
 
 import (
 	"fmt"
+	"github.com/omnibuildplatform/omni-orchestrator/application/middleware"
 	"github.com/omnibuildplatform/omni-orchestrator/docs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gookit/color"
 	"github.com/omnibuildplatform/omni-orchestrator/app"
-	"github.com/omnibuildplatform/omni-orchestrator/application/middleware"
 )
 
 const (
@@ -30,12 +30,12 @@ func InitServer() {
 	server = gin.New()
 	if app.EnvName == app.EnvDev {
 		server.Use(gin.Logger(), gin.Recovery())
+	} else {
+		server.Use(middleware.RequestLog())
 	}
 	//base url
 	docs.SwaggerInfo.BasePath = BASE_PATH
 	routerGroup = server.Group(BASE_PATH)
-	server.Use(middleware.RequestLog())
-
 	AddRoutes(server)
 
 }

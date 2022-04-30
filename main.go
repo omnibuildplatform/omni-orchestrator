@@ -1,8 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
-	"github.com/gookit/color"
 	"github.com/omnibuildplatform/omni-orchestrator/app"
 	"github.com/omnibuildplatform/omni-orchestrator/application"
 	"os"
@@ -27,10 +28,54 @@ func init() {
 	application.InitServer()
 }
 func printVersion() {
-	color.Info.Printf("============ Release Info ============:\n")
-	color.Info.Printf("Git Tag: %s\n", app.Info.Tag)
-	color.Info.Printf("Git CommitID: %s\n", app.Info.CommitID)
-	color.Info.Printf("Released At: %s\n", app.Info.ReleaseAt)
+	app.Logger.Info("============ Release Info ============")
+	app.Logger.Info(fmt.Sprintf("Git Tag: %s", app.Info.Tag))
+	app.Logger.Info(fmt.Sprintf("Git CommitID: %s", app.Info.CommitID))
+	app.Logger.Info(fmt.Sprintf("Released At: %s", app.Info.ReleaseAt))
+}
+
+func watchReloadDir() {
+	var changed bool
+	watcher, err := fsnotify.NewWatcher()
+	signalTicker := time.NewTicker(10 * time.Second)
+	if scheduler == nil {
+		return
+	}
+	for _, dir := range scheduler.GetReloadDirs() {
+		err = watcher.Add(dir)
+		if err != nil {
+			app.Logger.Error(fmt.Sprintf("[dir watcher] failed to add directory %s to watch list: %v", dir, err))
+			os.Exit(1)
+		} else {
+			app.Logger.Info(fmt.Sprintf("[dir watcher] directory %s added to watch list", dir))
+		}
+	}
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Chmod != fsnotify.Chmod {
+				app.Logger.Info(fmt.Sprintf("[dir watcher] modified file: %s", event.Name))
+				changed = true
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			app.Logger.Error(fmt.Sprintf("[dir watcher] error: %v\n", err))
+		case _, ok := <-signalTicker.C:
+			if !ok {
+				return
+			}
+			if changed {
+				scheduler.Reload()
+				changed = false
+			}
+		}
+	}
+
 }
 func main() {
 	printVersion()
@@ -39,20 +84,21 @@ func main() {
 	scheduler, err = application.NewOrchestrator(app.AppConfig, application.RouterGroup().Group("/jobs"),
 		app.Logger)
 	if err != nil {
-		color.Error.Printf("failed to create orchestrator: %v\n", err)
+		app.Logger.Error(fmt.Sprintf("failed to create orchestrator: %v", err))
 		os.Exit(1)
 	}
 	err = scheduler.Initialize()
 	if err != nil {
-		color.Error.Printf("failed to initialize orchestrator: %v\n", err)
+		app.Logger.Error(fmt.Sprintf("failed to initialize orchestrator: %v", err))
 		os.Exit(1)
 	}
 	err = scheduler.StartLoop()
 	if err != nil {
-		color.Error.Printf("failed to start orchestrator loop: %v\n", err)
+		app.Logger.Error(fmt.Sprintf("failed to start orchestrator loop: %v", err))
 		os.Exit(1)
 	}
-	color.Info.Printf("============  Begin Running(PID: %d) ============\n", os.Getpid())
+	go watchReloadDir()
+	app.Logger.Info(fmt.Sprintf("============  Begin Running(PID: %d) ============", os.Getpid()))
 	application.Run()
 }
 
@@ -79,7 +125,7 @@ func listenSignals() {
 // handleSignals handle process signal
 func handleSignals(c chan os.Signal) {
 	var quit = false
-	color.Info.Printf("Notice: System signal monitoring is enabled(watch: SIGINT,SIGTERM,SIGQUIT,SIGHUP)\n")
+	app.Logger.Info("Notice: System signal monitoring is enabled(watch: SIGINT,SIGTERM,SIGQUIT,SIGHUP)")
 	for {
 		if quit {
 			break
@@ -92,20 +138,20 @@ func handleSignals(c chan os.Signal) {
 			} else {
 				switch s {
 				case syscall.SIGHUP:
-					color.Info.Printf("Configuration reload\n")
+					app.Logger.Info("Configuration reload")
 					if scheduler != nil {
 						scheduler.Reload()
 					}
 				case syscall.SIGINT:
-					color.Info.Printf("\nShutdown by Ctrl+C")
+					app.Logger.Info("Shutdown by Ctrl+C")
 					quit = true
 					break
 				case syscall.SIGTERM: // by kill
-					color.Info.Printf("\nShutdown quickly")
+					app.Logger.Info("Shutdown quickly")
 					quit = true
 					break
 				case syscall.SIGQUIT:
-					color.Info.Printf("\nShutdown gracefully")
+					app.Logger.Info("Shutdown gracefully")
 					quit = true
 					break
 					// do graceful shutdown
@@ -121,6 +167,6 @@ func handleSignals(c chan os.Signal) {
 	}
 	//sleep and exit
 	time.Sleep(time.Second * 1)
-	color.Info.Println("\nGoodBye...")
+	app.Logger.Info("GoodBye...")
 	os.Exit(0)
 }

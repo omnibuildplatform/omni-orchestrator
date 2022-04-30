@@ -54,4 +54,4 @@ cassandra:
 ## deploy yaml
 generate:
 	cp -rf resources/kubernetes_templates/* ./deploy/resources
-	cd ./deploy && kustomize edit set image ${IMG} && kustomize build .
+	cd ./deploy && kustomize edit set image ${IMG} && kustomize build . >  ../deploy.yaml

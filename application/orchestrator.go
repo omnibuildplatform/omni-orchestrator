@@ -374,6 +374,25 @@ func (r *Orchestrator) Reload() {
 	}
 }
 
+func (r *Orchestrator) GetReloadDirs() []string {
+	var dirs []string
+	if r.logManager != nil {
+		for _, d := range r.logManager.GetReloadDirs() {
+			if !common.StringContain(dirs, d) {
+				dirs = append(dirs, d)
+			}
+		}
+	}
+	if r.jobManager != nil {
+		for _, d := range r.jobManager.GetReloadDirs() {
+			if !common.StringContain(dirs, d) {
+				dirs = append(dirs, d)
+			}
+		}
+	}
+	return dirs
+}
+
 func (r *Orchestrator) Close() {
 	//close job first
 	if r.jobManager != nil {

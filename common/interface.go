@@ -91,6 +91,7 @@ type (
 	}
 	Reloadable interface {
 		Reload()
+		GetReloadDirs() []string
 	}
 
 	EngineFactory interface {

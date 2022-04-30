@@ -189,6 +189,17 @@ func (m *jobManagerImpl) Reload() {
 	m.logger.Info("job manager configuration reloaded")
 }
 
+func (m *jobManagerImpl) GetReloadDirs() []string {
+	var dirs []string
+	if m.engine != nil {
+		dirs = append(dirs, m.engine.GetReloadDirs()...)
+	}
+	if m.store != nil {
+		dirs = append(dirs, m.store.GetReloadDirs()...)
+	}
+	return dirs
+}
+
 func (m *jobManagerImpl) StartLoop() error {
 	if m.engine == nil {
 		return errors.New("task engine is empty")
