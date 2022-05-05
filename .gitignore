@@ -25,3 +25,4 @@ vendor
 # job templates folder, generated via makefile
 deploy/resources
 deploy.yaml
+logs/
