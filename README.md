@@ -104,7 +104,11 @@ metadata:
 任务的状态信息同步及日志收集均依赖后台goroutine，即使后续迁移日志收集逻辑到worker本身，`Orchestrator`本身也存在单点故障和性能瓶颈，因此我们需要考虑服务的多节点支持。
 
 ## 数据库迁移
-项目使用[golang-migrate](https://github.com/golang-migrate)完成数据库的schema版本管理，部署应用会自动使用CMD完成数据库schema的升级，开发过程中数据库的变更需要使用命令创建sql文件:
+项目使用 [golang-migrate](https://github.com/golang-migrate) 完成数据库的schema版本管理，部署应用会自动使用CMD完成数据库schema的升级，开发过程中数据库的变更需要使用命令创建sql文件:
 ```shell
 migrate create -ext sql -dir database/schema/cassandra/migrations -seq <db-migrate-notice>
+```
+**注意**: migrate本身不支持创建cassandra keyspace，因此，项目本身开发了CMD支撑keyspace的创建，详见样例:
+```shell
+./bin/omni-orchestrator db-init --schemaFile ./database/schema/cassandra/keyspace.cql
 ```
