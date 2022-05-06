@@ -20,12 +20,12 @@ test: fmt vet swagger-doc
 
 # Build manager binary
 manager: fmt vet swagger-doc
-	go build -ldflags "-X main.Tag=$(GIT_TAG) -X main.CommitID=$(GIT_COMMIT) -X main.ReleaseAt=$(RELEASED_AT)"  -o bin/manager main.go
+	go build -ldflags "-X main.Tag=$(GIT_TAG) -X main.CommitID=$(GIT_COMMIT) -X main.ReleaseAt=$(RELEASED_AT)"  -o bin/omni-orchestrator main.go
 
 # Run up server
 # NOTE(tommylike): do not use go run command for the issue of signal relay issue
 run: manager
-	./bin/manager
+	./bin/omni-orchestrator run
 
 # Generate swagger docs
 swagger-doc:
@@ -48,7 +48,7 @@ docker-push:
 	docker push ${IMG}
 
 ## Prepare cassandra
-cassandra:
+cassandra: manager
 	./scripts/prepare-database.sh
 
 ## deploy yaml

@@ -8,7 +8,7 @@ import (
 func GetResourceType(name string) plugins.KubernetesResource {
 	availableResources := []plugins.KubernetesResource{plugins.ResJob, plugins.ResDeployment, plugins.ResConfigmap}
 	for _, v := range availableResources {
-		if string(v) == strings.ToLower(name) {
+		if strings.HasPrefix(strings.ToLower(name), string(v)) {
 			return v
 		}
 	}
