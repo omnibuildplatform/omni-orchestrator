@@ -10,11 +10,17 @@ commonLabels:
   app: omni-orchestrator-server
   owner: tommylike
 # used for job templates, update this when template files add or removed
+# job: build image from official release
+# job: build image from iso file
 configMapGenerator:
 - files:
   - configmap.yaml=resources/buildimagefromrelease/configmap.yaml
   - job.yaml=resources/buildimagefromrelease/job.yaml
   name: omni-orchestrator-templates-buildimagefromrelease
+- files:
+  - configmap.yaml=resources/buildimagefromiso/configmap.yaml
+  - job.yaml=resources/buildimagefromiso/job.yaml
+  name: omni-orchestrator-templates-buildimagefromiso
 commonAnnotations:
   email: tommylikehu@gmail.com
 namespace: omni-orchestrator

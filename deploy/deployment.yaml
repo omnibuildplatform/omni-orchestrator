@@ -62,6 +62,8 @@ spec:
             # used for job templates, update this when template files add or removed
             - mountPath: /app/config/templates/buildimagefromrelease/
               name: job-templates-volume-buildimagefromrelease
+            - mountPath: /app/config/templates/buildimagefromiso/
+              name: job-templates-volume-buildimagefromiso
       serviceAccountName: omni-orchestrator
       volumes:
         - name: config-volume
@@ -70,6 +72,9 @@ spec:
         - name: job-templates-volume-buildimagefromrelease
           configMap:
             name: omni-orchestrator-templates-buildimagefromrelease
+        - name: job-templates-volume-buildimagefromiso
+          configMap:
+            name: omni-orchestrator-templates-buildimagefromiso
 ---
 apiVersion: apps/v1
 kind: Deployment

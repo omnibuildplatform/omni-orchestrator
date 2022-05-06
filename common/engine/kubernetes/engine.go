@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/omnibuildplatform/omni-orchestrator/common"
 	appconfig "github.com/omnibuildplatform/omni-orchestrator/common/config"
+	//Plugins Register
+	_ "github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/buildimagefromiso"
 	_ "github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/buildimagefromrelease"
 	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/plugins"
 	"go.uber.org/zap"
