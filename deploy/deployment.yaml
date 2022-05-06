@@ -16,6 +16,16 @@ spec:
         - name: init-cassandra
           image: busybox:1.28
           command: [ "sh", "-c", "until nslookup omni-cassandra.omni-orchestrator.svc.cluster.local; do echo waiting for cassandra service ; sleep 2; done;" ]
+        - name: prepare-keyspace
+          image: opensourceway/omni-orchestrator:960aa021baf3f021d0bdca3df7fd310405aa982d
+          command: ["/app/omni-orchestrator", "db-init", "--schemaFile", "/app/cassandra/keyspace.cql"]
+          volumeMounts:
+            - mountPath: /app/config/app.toml
+              name: config-volume
+              subPath: app.toml
+        - name: prepare-schema
+          image: opensourceway/omni-orchestrator:960aa021baf3f021d0bdca3df7fd310405aa982d
+          command: [ "migrate", "-source", "file:///app/cassandra/migrations", "--database", "cassandra://omni-cassandra.omni-orchestrator.svc.cluster.local:9042/omni_orchestrator", "up"]
       containers:
         - image: opensourceway/omni-orchestrator:960aa021baf3f021d0bdca3df7fd310405aa982d
           imagePullPolicy: Always

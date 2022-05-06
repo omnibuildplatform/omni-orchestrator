@@ -25,6 +25,14 @@ function check-prerequisites {
     else
       echo -n "found cqlsh, " && cqlsh --version
     fi
+  echo "checking migrate"
+    which migrate >/dev/null 2>&1
+    if [[ $? -ne 0 ]]; then
+      echo "migrate not installed, please refer to https://github.com/golang-migrate/migrate/tree/master/cmd/migrate for installing, exiting."
+      exit 1
+    else
+      echo -n "found migrate, " && migrate --version
+    fi
 }
 
 function cassandra-cluster-up {
@@ -43,8 +51,8 @@ function cassandra-cluster-up {
 
 function prepare-database {
   echo "creating keyspace and table"
-  cqlsh -f ./database/schema/cassandra/keyspace.cql
-  cqlsh -f ./database/schema/cassandra/orchestrator.cql
+  ./bin/omni-orchestrator db-init --schemaFile ./database/schema/cassandra/keyspace.cql
+  migrate -source file://./database/schema/cassandra/migrations --database cassandra://127.0.0.1:9042/omni_orchestrator up
 }
 
 echo "Preparing environment for omni-orchestrator developing......"
