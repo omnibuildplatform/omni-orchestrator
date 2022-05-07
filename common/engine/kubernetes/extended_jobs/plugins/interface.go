@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"github.com/omnibuildplatform/omni-orchestrator/common"
 	"go.uber.org/zap"
 )
 
@@ -20,6 +21,6 @@ type (
 
 	JobHandler interface {
 		Reload()
-		Serialize(namespace, name string, parameters map[string]interface{}) (map[KubernetesResource][]byte, string, error)
+		Serialize(namespace, name string, job common.Job) (map[KubernetesResource][]byte, string, error)
 	}
 )

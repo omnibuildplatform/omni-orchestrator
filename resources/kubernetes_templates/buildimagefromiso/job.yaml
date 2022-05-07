@@ -24,33 +24,24 @@ spec:
             - mkdir -p /data/isos; curl -vvv {{ index . "imageUrl" }} -o /data/isos/{{ index . "imageName" }}
           image: alpine/curl
           imagePullPolicy: Always
-          name: download-iso
+          name: download-image
           volumeMounts:
             - mountPath: /data/
               name: {{ index . "name" }}-data
-        - command:
-            - sh
-            - -c
-            - mknod /dev/loop1001 b 7 1001;chown --reference=/dev/loop0 /dev/loop1001;chmod --reference=/dev/loop0 /dev/loop1001
-          image: tommylike/omni-worker:0.3.1
-          securityContext:
-            privileged: true
-          imagePullPolicy: Always
-          name: prepare-loop-device
         - command:
             - omni-imager
             - edit ks
             - --config-file
             - /etc/omni-imager/conf.yaml
             - --ks
-            -
+            - /etc/omni-imager/ks.cfg
             - --iso
             - /data/isos/{{ index . "imageName" }}
             - --output-file
             - Customized-{{ index . "name" }}.iso
-          image: tommylike/omni-worker:0.3.1
+          image: tommylike/omni-worker:0.3.2
           imagePullPolicy: IfNotPresent
-          name: image-build
+          name: build-image
           securityContext:
             privileged: true
           volumeMounts:
@@ -66,13 +57,13 @@ spec:
             - curl
             - -vvv
             - -Ffile=@/data/omni-workspace/Customized-{{ index . "name" }}.iso
-            - -Fproject=buildimagefromiso
-            - -FfileType=image
-            - -Fid={{ index . "name" }}
+            - -Ftype={{ index . "type" }}
+            - -FexternalID={{ index . "name" }}
+            - -Fusername={{ index . "userID" }}
             - http://omni-repository.omni-repository.svc.cluster.local/data/upload?token=316462d0c029ba707ad2
           image: alpine/curl
           imagePullPolicy: Always
-          name: image-upload
+          name: upload-image
           volumeMounts:
             - mountPath: /data/
               name: {{ index . "name" }}-data

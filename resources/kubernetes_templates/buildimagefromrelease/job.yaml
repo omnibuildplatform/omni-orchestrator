@@ -56,9 +56,9 @@ spec:
             - curl
             - -vvv
             - -Ffile=@/data/omni-workspace/openEuler-{{ index . "name" }}.iso
-            - -Fproject=buildimagefromiso
-            - -FfileType=image
-            - -Fid={{ index . "name" }}
+            - -Ftype={{ index . "type" }}
+            - -FexternalID={{ index . "name" }}
+            - -Fusername={{ index . "userID" }}
             - http://omni-repository.omni-repository.svc.cluster.local/data/upload?token=316462d0c029ba707ad2
           image: alpine/curl
           imagePullPolicy: Always

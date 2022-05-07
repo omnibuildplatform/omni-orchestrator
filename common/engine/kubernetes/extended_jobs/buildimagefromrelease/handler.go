@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"github.com/omnibuildplatform/omni-orchestrator/common"
 	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs"
 	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/plugins"
 	"go.uber.org/zap"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
@@ -26,36 +25,6 @@ type JobImageBuildFromReleasePara struct {
 
 type BuildImagePackages struct {
 	Packages []string `json:"packages"`
-}
-
-func loadTemplates(folder string) (map[plugins.KubernetesResource][]byte, error) {
-	templates := make(map[plugins.KubernetesResource][]byte)
-	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return nil
-		}
-		//read all yaml file
-		if strings.HasSuffix(path, ".yaml") {
-			templateFile, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			defer templateFile.Close()
-			bytes, err := ioutil.ReadAll(templateFile)
-			if err != nil {
-				return err
-			}
-			templates[extended_jobs.GetResourceType(info.Name())] = bytes
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return templates, nil
 }
 
 type Handler struct {
@@ -80,7 +49,7 @@ func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
 		logger:     logger,
 		dataFolder: dataFolder,
 	}
-	handler.templates, err = loadTemplates(dataFolder)
+	handler.templates, err = extended_jobs.LoadTemplates(dataFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +59,7 @@ func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
 func (h *Handler) Reload() {
 	h.Lock()
 	defer h.Unlock()
-	templates, err := loadTemplates(h.dataFolder)
+	templates, err := extended_jobs.LoadTemplates(h.dataFolder)
 	if err != nil {
 		h.logger.Warn(fmt.Sprintf("unable to reload template files %s", err))
 	} else {
@@ -98,12 +67,12 @@ func (h *Handler) Reload() {
 	}
 	h.logger.Info("extend job:buildimagefromrelease reloaded job templates")
 }
-func (h *Handler) Serialize(namespace, name string, parameters map[string]interface{}) (map[plugins.KubernetesResource][]byte, string, error) {
+func (h *Handler) Serialize(namespace, name string, job common.Job) (map[plugins.KubernetesResource][]byte, string, error) {
 	renderedTemplates := make(map[plugins.KubernetesResource][]byte)
 	var paras JobImageBuildFromReleasePara
 	h.name = name
 	h.namespace = namespace
-	err := mapstructure.Decode(parameters, &paras)
+	err := mapstructure.Decode(job.Spec, &paras)
 	if err != nil {
 		return map[plugins.KubernetesResource][]byte{}, "", errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
 	}
@@ -124,6 +93,8 @@ func (h *Handler) Serialize(namespace, name string, parameters map[string]interf
 		"version":   paras.Version,
 		"packages":  string(packages),
 		"format":    paras.Format,
+		"userID":    job.UserID,
+		"type":      "buildimagefromrelease",
 	}
 	h.Lock()
 	defer h.Unlock()

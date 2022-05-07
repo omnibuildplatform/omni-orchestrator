@@ -361,7 +361,7 @@ func (e *Engine) CreateJob(ctx context.Context, job *common.Job) error {
 	if err != nil {
 		return err
 	}
-	templates, architecture, err := jobHandler.Serialize(e.ConvertToNamespace(job.Domain), job.ID, job.Spec)
+	templates, architecture, err := jobHandler.Serialize(e.ConvertToNamespace(job.Domain), job.ID, *job)
 	for k, v := range templates {
 		if k == plugins.ResUnSupported {
 			return syserror.New(fmt.Sprintf("%s resource is unsupported, please update the available resource type", v))

@@ -5,21 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"github.com/omnibuildplatform/omni-orchestrator/common"
 	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs"
 	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/plugins"
 	"go.uber.org/zap"
-	"io/ioutil"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
 )
 
 type JobImageBuildFromISOPara struct {
-	KickStart *CommonFile `json:"KickStart"`
-	Image     *ImageFile  `json:"Image"`
+	KickStart *CommonFile `json:"kickStart"`
+	Image     *ImageFile  `json:"image"`
 }
 
 type ImageFile struct {
@@ -34,7 +33,7 @@ type CommonFile struct {
 }
 
 func imageValid(f ImageFile) error {
-	if len(f.Url) == 0 || len(f.CheckSum) == 0 || len(f.Name) == 0 || len(f.Architecture) == 0{
+	if len(f.Url) == 0 || len(f.CheckSum) == 0 || len(f.Name) == 0 || len(f.Architecture) == 0 {
 		return errors.New("url, checksum, filename or architecture empty")
 	}
 	u, err := url.ParseRequestURI(f.Url)
@@ -45,36 +44,6 @@ func imageValid(f ImageFile) error {
 		return errors.New("acceptable schema for url are http and https")
 	}
 	return nil
-}
-
-func loadTemplates(folder string) (map[plugins.KubernetesResource][]byte, error) {
-	templates := make(map[plugins.KubernetesResource][]byte)
-	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return nil
-		}
-		//read all yaml file
-		if strings.HasSuffix(path, ".yaml") {
-			templateFile, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			defer templateFile.Close()
-			bytes, err := ioutil.ReadAll(templateFile)
-			if err != nil {
-				return err
-			}
-			templates[extended_jobs.GetResourceType(info.Name())] = bytes
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return templates, nil
 }
 
 type Handler struct {
@@ -99,7 +68,7 @@ func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
 		logger:     logger,
 		dataFolder: dataFolder,
 	}
-	handler.templates, err = loadTemplates(dataFolder)
+	handler.templates, err = extended_jobs.LoadTemplates(dataFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +78,7 @@ func NewHandler(dataFolder string, logger *zap.Logger) (*Handler, error) {
 func (h *Handler) Reload() {
 	h.Lock()
 	defer h.Unlock()
-	templates, err := loadTemplates(h.dataFolder)
+	templates, err := extended_jobs.LoadTemplates(h.dataFolder)
 	if err != nil {
 		h.logger.Warn(fmt.Sprintf("unable to reload template files %s", err))
 	} else {
@@ -117,12 +86,12 @@ func (h *Handler) Reload() {
 	}
 	h.logger.Info("extend job:buildimagefromiso reloaded job templates")
 }
-func (h *Handler) Serialize(namespace, name string, parameters map[string]interface{}) (map[plugins.KubernetesResource][]byte, string, error) {
+func (h *Handler) Serialize(namespace, name string, job common.Job) (map[plugins.KubernetesResource][]byte, string, error) {
 	renderedTemplates := make(map[plugins.KubernetesResource][]byte)
 	var paras JobImageBuildFromISOPara
 	h.name = name
 	h.namespace = namespace
-	err := mapstructure.Decode(parameters, &paras)
+	err := mapstructure.Decode(job.Spec, &paras)
 	if err != nil {
 		return map[plugins.KubernetesResource][]byte{}, "", errors.New(fmt.Sprintf("unable to decode job specification %s for JobImageBuildFromISOPara job", err))
 	}
@@ -137,12 +106,14 @@ func (h *Handler) Serialize(namespace, name string, parameters map[string]interf
 		return map[plugins.KubernetesResource][]byte{}, "", errors.New("kickstart content or name empty")
 	}
 	variables := map[string]string{
-		"name":          h.name,
-		"namespace":     h.namespace,
-		"imageUrl":      paras.Image.Url,
-		"imageName":     paras.Image.Name,
-		"kickstartContent":  paras.KickStart.Content,
-		"kickstartName": paras.KickStart.Name,
+		"name":             h.name,
+		"namespace":        h.namespace,
+		"imageUrl":         paras.Image.Url,
+		"imageName":        paras.Image.Name,
+		"kickstartContent": paras.KickStart.Content,
+		"kickstartName":    paras.KickStart.Name,
+		"userID":           job.UserID,
+		"type":             "buildimagefromiso",
 	}
 	h.Lock()
 	defer h.Unlock()
