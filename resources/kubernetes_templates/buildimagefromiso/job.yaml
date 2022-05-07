@@ -54,7 +54,7 @@ spec:
             - mountPath: /data/
               name: {{ index . "name" }}-data
             - mountPath: /dev/
-              name: hostDeviceVolume
+              name: hostdevicevolume
         - command:
             - curl
             - -vvv
@@ -71,7 +71,7 @@ spec:
               name: {{ index . "name" }}-data
       restartPolicy: Never
       volumes:
-        - name: hostDeviceVolume
+        - name: hostdevicevolume
           hostPath:
             path: /dev
             type: Directory
