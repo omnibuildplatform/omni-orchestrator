@@ -1,8 +1,7 @@
-package buildimagefromrelease
+package buildimagefromiso
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
@@ -10,21 +9,41 @@ import (
 	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs"
 	"github.com/omnibuildplatform/omni-orchestrator/common/engine/kubernetes/extended_jobs/plugins"
 	"go.uber.org/zap"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
 	"text/template"
 )
 
-type JobImageBuildFromReleasePara struct {
-	Version      string   `json:"version"`
-	Packages     []string `json:"packages"`
-	Format       string   `json:"format"`
-	Architecture string   `json:"architecture"`
+type JobImageBuildFromISOPara struct {
+	KickStart *CommonFile `json:"kickStart"`
+	Image     *ImageFile  `json:"image"`
 }
 
-type BuildImagePackages struct {
-	Packages []string `json:"packages"`
+type ImageFile struct {
+	Url          string `json:"url"`
+	CheckSum     string `json:"checksum"`
+	Name         string `json:"name"`
+	Architecture string `json:"architecture"`
+}
+type CommonFile struct {
+	Content string `json:"content"`
+	Name    string `json:"name"`
+}
+
+func imageValid(f ImageFile) error {
+	if len(f.Url) == 0 || len(f.CheckSum) == 0 || len(f.Name) == 0 || len(f.Architecture) == 0 {
+		return errors.New("url, checksum, filename or architecture empty")
+	}
+	u, err := url.ParseRequestURI(f.Url)
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(strings.ToLower(u.Scheme), "http") {
+		return errors.New("acceptable schema for url are http and https")
+	}
+	return nil
 }
 
 type Handler struct {
@@ -65,36 +84,36 @@ func (h *Handler) Reload() {
 	} else {
 		h.templates = templates
 	}
-	h.logger.Info("extend job:buildimagefromrelease reloaded job templates")
+	h.logger.Info("extend job:buildimagefromiso reloaded job templates")
 }
 func (h *Handler) Serialize(namespace, name string, job common.Job) (map[plugins.KubernetesResource][]byte, string, error) {
 	renderedTemplates := make(map[plugins.KubernetesResource][]byte)
-	var paras JobImageBuildFromReleasePara
+	var paras JobImageBuildFromISOPara
 	h.name = name
 	h.namespace = namespace
 	err := mapstructure.Decode(job.Spec, &paras)
 	if err != nil {
-		return map[plugins.KubernetesResource][]byte{}, "", errors.New(fmt.Sprintf("unable to decode job specification %s for BuildImageFromRelease job", err))
+		return map[plugins.KubernetesResource][]byte{}, "", errors.New(fmt.Sprintf("unable to decode job specification %s for JobImageBuildFromISOPara job", err))
 	}
-	if len(paras.Version) == 0 || len(paras.Format) == 0 || len(paras.Packages) == 0 || len(paras.Architecture) == 0 {
-		return map[plugins.KubernetesResource][]byte{}, "", errors.New("format packages, architecture or version empty")
+	if paras.KickStart == nil || paras.Image == nil {
+		return map[plugins.KubernetesResource][]byte{}, "", errors.New("kickstart image, name empty")
 	}
-	// parse templates
-	wrapPackages := BuildImagePackages{
-		Packages: paras.Packages,
-	}
-	packages, err := json.Marshal(wrapPackages)
+	err = imageValid(*paras.Image)
 	if err != nil {
 		return map[plugins.KubernetesResource][]byte{}, "", err
 	}
+	if len(paras.KickStart.Name) == 0 || len(paras.KickStart.Content) == 0 {
+		return map[plugins.KubernetesResource][]byte{}, "", errors.New("kickstart content or name empty")
+	}
 	variables := map[string]string{
-		"name":      h.name,
-		"namespace": h.namespace,
-		"version":   paras.Version,
-		"packages":  string(packages),
-		"format":    paras.Format,
-		"userID":    job.UserID,
-		"type":      "buildimagefromrelease",
+		"name":             h.name,
+		"namespace":        h.namespace,
+		"imageUrl":         paras.Image.Url,
+		"imageName":        paras.Image.Name,
+		"kickstartContent": paras.KickStart.Content,
+		"kickstartName":    paras.KickStart.Name,
+		"userID":           job.UserID,
+		"type":             "buildimagefromiso",
 	}
 	h.Lock()
 	defer h.Unlock()
@@ -110,5 +129,5 @@ func (h *Handler) Serialize(namespace, name string, job common.Job) (map[plugins
 		}
 		renderedTemplates[k] = buffer.Bytes()
 	}
-	return renderedTemplates, strings.ToLower(paras.Architecture), nil
+	return renderedTemplates, strings.ToLower(paras.Image.Architecture), nil
 }

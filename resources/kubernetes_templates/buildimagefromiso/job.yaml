@@ -21,48 +21,49 @@ spec:
         - command:
             - sh
             - -c
-            - mkdir -p /data/rootfs_cache; curl -vvv http://omni-repository.omni-repository.svc.cluster.local/data/browse/util/imager/rootfs.tar.gz -o /data/rootfs_cache/rootfs.tar.gz
+            - mkdir -p /data/isos; curl -vvv {{ index . "imageUrl" }} -o /data/isos/{{ index . "imageName" }}
           image: alpine/curl
           imagePullPolicy: Always
-          name: rootfs-download
+          name: download-image
           volumeMounts:
             - mountPath: /data/
               name: {{ index . "name" }}-data
         - command:
             - omni-imager
-            - --package-list
-            - /etc/omni-imager/openEuler-customized.json
+            - edit ks
             - --config-file
             - /etc/omni-imager/conf.yaml
-            - --build-type
-            - {{ index . "format" }}
+            - --ks
+            - /etc/omni-imager/ks.cfg
+            - --iso
+            - /data/isos/{{ index . "imageName" }}
             - --output-file
-            - openEuler-{{ index . "name" }}.iso
-          image: tommylike/omni-worker:0.2.3
+            - Customized-{{ index . "name" }}.iso
+          image: tommylike/omni-worker:0.3.2
           imagePullPolicy: IfNotPresent
-          name: image-build
+          name: build-image
           securityContext:
             privileged: true
           volumeMounts:
-            - mountPath: /etc/omni-imager/openEuler-customized.json
-              name: {{ index . "name" }}-config
-              subPath: openEuler-customized.json
             - mountPath: /etc/omni-imager/conf.yaml
               name: {{ index . "name" }}-config
               subPath: conf.yaml
+            - mountPath: /etc/omni-imager/ks.cfg
+              name: {{ index . "name" }}-config
+              subPath: ks.cfg
             - mountPath: /data/
               name: {{ index . "name" }}-data
         - command:
             - curl
             - -vvv
-            - -Ffile=@/data/omni-workspace/openEuler-{{ index . "name" }}.iso
+            - -Ffile=@/data/omni-workspace/Customized-{{ index . "name" }}.iso
             - -Ftype={{ index . "type" }}
             - -FexternalID={{ index . "name" }}
             - -Fusername={{ index . "userID" }}
             - http://omni-repository.omni-repository.svc.cluster.local/data/upload?token=316462d0c029ba707ad2
           image: alpine/curl
           imagePullPolicy: Always
-          name: image-upload
+          name: upload-image
           volumeMounts:
             - mountPath: /data/
               name: {{ index . "name" }}-data

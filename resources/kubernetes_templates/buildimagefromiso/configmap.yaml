@@ -1,0 +1,11 @@
+apiVersion: v1
+data:
+  conf.yaml: |-
+    working_dir: /data/omni-workspace
+    debug: True
+  ks.cfg: |-
+    {{ index . "kickstartContent" }}
+kind: ConfigMap
+metadata:
+  name: {{ index . "name" }}
+  namespace: {{ index . "namespace" }}

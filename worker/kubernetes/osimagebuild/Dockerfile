@@ -1,10 +1,10 @@
 FROM openeuler/openeuler:21.09
 LABEL maintainer="TommyLike<tommylikehu@gmail.com>"
-ARG ImageVersion="0.2.3"
+ARG ImageVersion="0.3.2"
 
 # Update repo
 COPY openEuler.repo /etc/yum.repos.d/openEuler.repo
-RUN yum -y update && yum -y install dnf dnf-plugins-core createrepo genisoimage cpio gzip tar
+RUN yum -y update && yum -y install dnf dnf-plugins-core createrepo genisoimage cpio gzip tar cifs-utils syslinux
 # Install pip
 RUN curl -fsSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3 get-pip.py && rm ./get-pip.py
 # Install omni imager
