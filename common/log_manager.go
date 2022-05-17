@@ -224,10 +224,11 @@ func (l *logManagerImpl) InsertLogPart(context context.Context, jobStep JobStepI
 func (l *logManagerImpl) ReadJobStepLog(context context.Context, jobStep JobStepInfo, reader io.ReadCloser) error {
 	defer reader.Close()
 	var logs []byte
-	ticker := time.NewTicker(JobLogStoreInterval * time.Second)
+	tickerFlush := time.NewTicker(JobLogStoreInterval * time.Second)
+	tickerCollect := time.NewTicker(JobLogStoreInterval * time.Second / 2)
 	for {
 		select {
-		case <-ticker.C:
+		case <-tickerFlush.C:
 			if len(logs) == 0 {
 				break
 			}
@@ -239,7 +240,7 @@ func (l *logManagerImpl) ReadJobStepLog(context context.Context, jobStep JobStep
 		case <-context.Done():
 			l.logger.Info("context canceled, sync job log will quit")
 			return nil
-		default:
+		case <-tickerCollect.C:
 			buf := make([]byte, JobLogReadSize)
 			numBytes, err := reader.Read(buf)
 			if numBytes == 0 {
