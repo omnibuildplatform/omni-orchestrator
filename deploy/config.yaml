@@ -14,7 +14,7 @@ data:
     worker = 3
     syncInterval = 3
     [logManager]
-    worker = 6
+    worker = 20
     ttl = 2592000
     [engine]
     pluginName = "kubernetes"

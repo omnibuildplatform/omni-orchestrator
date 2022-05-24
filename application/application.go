@@ -2,7 +2,6 @@ package application
 
 import (
 	"fmt"
-	"github.com/omnibuildplatform/omni-orchestrator/application/middleware"
 	"github.com/omnibuildplatform/omni-orchestrator/docs"
 
 	"github.com/gin-gonic/gin"
@@ -28,10 +27,15 @@ func RouterGroup() *gin.RouterGroup {
 
 func InitServer() {
 	server = gin.New()
+	skipPaths := []string{"/v1/health"}
 	if app.EnvName == app.EnvDev {
-		server.Use(gin.Logger(), gin.Recovery())
+		server.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+					SkipPaths: skipPaths,
+				}), gin.Recovery())
 	} else {
-		server.Use(middleware.RequestLog())
+		server.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+			SkipPaths: skipPaths,
+		}))
 	}
 	//base url
 	docs.SwaggerInfo.BasePath = BASE_PATH

@@ -30,7 +30,8 @@ spec:
               name: {{ index . "name" }}-data
         - command:
             - omni-imager
-            - edit ks
+            - edit
+            - ks
             - --config-file
             - /etc/omni-imager/conf.yaml
             - --ks
@@ -55,6 +56,13 @@ spec:
               name: {{ index . "name" }}-data
             - mountPath: /dev/
               name: hostdevicevolume
+          resources:
+            requests:
+              memory: "20480Mi"
+              cpu: "1000m"
+            limits:
+              memory: "20480Mi"
+              cpu: "1000m"
         - command:
             - curl
             - -vvv
@@ -81,5 +89,6 @@ spec:
           name: {{ index . "name" }}-config
         - emptyDir:
             sizeLimit: 20G
+            medium: Memory
           name: {{ index . "name" }}-data
   ttlSecondsAfterFinished: 1800
