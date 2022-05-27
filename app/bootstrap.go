@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	Config    *config.Config
 	AppConfig appconfig.Config
 )
 
@@ -48,9 +47,9 @@ func loadConfig(configDir string) {
 		os.Exit(1)
 	}
 	config.WithOptions(config.ParseEnv)
-	Config = config.Default()
+	cfg := config.Default()
 	config.AddDriver(toml.Driver)
-	err = Config.LoadFiles(files...)
+	err = cfg.LoadFiles(files...)
 	if err != nil {
 		color.Error.Println("failed to load config files %v", err)
 		os.Exit(1)

@@ -20,9 +20,8 @@ func newGenericLogger() {
 	var err error
 	var cfg zap.Config
 
-	conf := Config.StringMap("log")
-	logFile := conf["logFile"]
-	errFile := conf["errFile"]
+	logFile := AppConfig.LogConfig.LogFile
+	errFile := AppConfig.LogConfig.ErrFile
 
 	// replace
 	logFile = strings.NewReplacer(
