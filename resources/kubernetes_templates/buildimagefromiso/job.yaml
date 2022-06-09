@@ -66,11 +66,16 @@ spec:
         - command:
             - curl
             - -vvv
-            - -Ffile=@/data/omni-workspace/Customized-{{ index . "name" }}.iso
-            - -Ftype={{ index . "type" }}
+            - -FimageFile=@/data/omni-workspace/Customized-{{ index . "name" }}.iso
+            - -FchecksumFile=@/data/omni-workspace/Customized-{{ index . "name" }}.iso.sha256sum
+            - -Fname={{ index . "name" }}
+            - -Falgorithm=sha256
+            - -FfileName=Customized-{{ index . "name" }}.iso
             - -FexternalID={{ index . "name" }}
-            - -Fusername={{ index . "userID" }}
-            - http://omni-repository.omni-repository.svc.cluster.local/data/upload?token=316462d0c029ba707ad2
+            - -FuserID={{ index . "userID" }}
+            - -Fpublish=true
+            - -FexternalComponent=omni-orchestrator
+            - http://omni-repository.omni-repository.svc.cluster.local:8088/images/upload
           image: alpine/curl
           imagePullPolicy: Always
           name: upload-image
