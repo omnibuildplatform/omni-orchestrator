@@ -33,20 +33,20 @@ spec:
             - edit
             - ks
             - --config-file
-            - /etc/omni-imager/conf.yaml
+            - /etc/omni-imager/conf.init
             - --ks
             - /etc/omni-imager/ks.cfg
             - --iso
             - /data/isos/{{ index . "imageName" }}
             - --output-file
             - Customized-{{ index . "name" }}.iso
-          image: tommylike/omni-worker:0.3.2
+          image: tommylike/omni-worker:0.4.0
           imagePullPolicy: IfNotPresent
           name: build-image
           securityContext:
             privileged: true
           volumeMounts:
-            - mountPath: /etc/omni-imager/conf.yaml
+            - mountPath: /etc/omni-imager/conf.init
               name: {{ index . "name" }}-config
               subPath: conf.yaml
             - mountPath: /etc/omni-imager/ks.cfg

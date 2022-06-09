@@ -19,26 +19,16 @@ spec:
       dnsPolicy: ClusterFirst
       initContainers:
         - command:
-            - sh
-            - -c
-            - mkdir -p /data/rootfs_cache; curl -vvv http://omni-repository.omni-repository.svc.cluster.local/data/browse/util/imager/rootfs.tar.gz -o /data/rootfs_cache/rootfs.tar.gz
-          image: alpine/curl
-          imagePullPolicy: Always
-          name: rootfs-download
-          volumeMounts:
-            - mountPath: /data/
-              name: {{ index . "name" }}-data
-        - command:
             - omni-imager
             - --package-list
             - /etc/omni-imager/openEuler-customized.json
             - --config-file
-            - /etc/omni-imager/conf.yaml
+            - /etc/omni-imager/conf.init
             - --build-type
             - {{ index . "format" }}
             - --output-file
             - openEuler-{{ index . "name" }}.iso
-          image: tommylike/omni-worker:0.2.3
+          image: tommylike/omni-worker:0.4.0
           imagePullPolicy: IfNotPresent
           name: image-build
           securityContext:
@@ -47,7 +37,7 @@ spec:
             - mountPath: /etc/omni-imager/openEuler-customized.json
               name: {{ index . "name" }}-config
               subPath: openEuler-customized.json
-            - mountPath: /etc/omni-imager/conf.yaml
+            - mountPath: /etc/omni-imager/conf.init
               name: {{ index . "name" }}-config
               subPath: conf.yaml
             - mountPath: /data/
